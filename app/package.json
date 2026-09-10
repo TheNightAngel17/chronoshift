@@ -4,6 +4,7 @@
   "description": "A lightweight local time-tracking desktop app.",
   "main": "./out/main/index.js",
   "author": "TheNightAngel17",
+  "license": "MIT",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",
