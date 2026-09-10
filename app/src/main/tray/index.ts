@@ -16,7 +16,9 @@ export function createTray(options: CreateTrayOptions): Tray {
 
   tray = new Tray(options.iconPath)
   tray.setToolTip('ChronoShift')
-  tray.setContextMenu(Menu.buildFromTemplate(buildTrayMenuTemplate(options.onOpenMainWindow, options.onQuit)))
+  tray.setContextMenu(
+    Menu.buildFromTemplate(buildTrayMenuTemplate(options.onOpenMainWindow, options.onQuit))
+  )
   tray.on('click', options.onOpenMainWindow)
 
   return tray
