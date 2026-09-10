@@ -1,10 +1,9 @@
 {
-  "name": "app",
-  "version": "1.0.0",
-  "description": "An Electron application with React and TypeScript",
+  "name": "chronoshift",
+  "version": "0.1.0",
+  "description": "A lightweight local time-tracking desktop app.",
   "main": "./out/main/index.js",
-  "author": "example.com",
-  "homepage": "https://electron-vite.org",
+  "author": "TheNightAngel17",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",
@@ -18,7 +17,9 @@
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win",
     "build:mac": "electron-vite build && electron-builder --mac",
-    "build:linux": "electron-vite build && electron-builder --linux"
+    "build:linux": "electron-vite build && electron-builder --linux",
+    "test": "vitest --environment node",
+    "test:run": "vitest run --environment node"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
@@ -43,6 +44,7 @@
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "typescript": "^5.9.3",
-    "vite": "^7.2.6"
+    "vite": "^7.2.6",
+    "vitest": "^3.2.6"
   }
 }

@@ -1,34 +1,48 @@
-import Versions from './components/Versions'
-import electronLogo from './assets/electron.svg'
+import { useMemo, useState } from 'react'
+import { MAIN_TABS, type MainTabId } from '../../shared/tabs'
+import styles from './App.module.css'
 
 function App(): React.JSX.Element {
-  const ipcHandle = (): void => window.electron.ipcRenderer.send('ping')
+  const [activeTab, setActiveTab] = useState<MainTabId>('review')
+  const activePanel = useMemo(
+    () => MAIN_TABS.find((tab) => tab.id === activeTab) ?? MAIN_TABS[0],
+    [activeTab]
+  )
 
   return (
-    <>
-      <img alt="logo" className="logo" src={electronLogo} />
-      <div className="creator">Powered by electron-vite</div>
-      <div className="text">
-        Build an Electron app with <span className="react">React</span>
-        &nbsp;and <span className="ts">TypeScript</span>
-      </div>
-      <p className="tip">
-        Please try pressing <code>F12</code> to open the devTool
-      </p>
-      <div className="actions">
-        <div className="action">
-          <a href="https://electron-vite.org/" target="_blank" rel="noreferrer">
-            Documentation
-          </a>
+    <main className={styles.shell}>
+      <header className={styles.header}>
+        <div>
+          <p className={styles.eyebrow}>ChronoShift</p>
+          <h1 className={styles.title}>Local-first time tracking</h1>
+          <p className={styles.subtitle}>
+            Phase 1 is in place with the main application shell, ready for the tracking workflows to
+            be built out next.
+          </p>
         </div>
-        <div className="action">
-          <a target="_blank" rel="noreferrer" onClick={ipcHandle}>
-            Send IPC
-          </a>
+      </header>
+
+      <nav aria-label="Primary" className={styles.tabs}>
+        {MAIN_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            className={tab.id === activeTab ? styles.activeTab : styles.tab}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
+      <section className={styles.panel}>
+        <h2 className={styles.panelTitle}>{activePanel.label}</h2>
+        <p className={styles.panelDescription}>{activePanel.description}</p>
+        <div className={styles.placeholder}>
+          Empty state for the {activePanel.label.toLowerCase()} tab.
         </div>
-      </div>
-      <Versions></Versions>
-    </>
+      </section>
+    </main>
   )
 }
 
