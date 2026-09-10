@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci-build-test-check-dir:
+    runs-on: ubuntu-latest
+    outputs:
+      app_changed: ${{ steps.changes.outputs.app_changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for app/ changes
+        id: changes
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+          fi
+          if [ -z "$base" ] || ! git cat-file -e "$base" 2>/dev/null; then
+            echo "No usable base commit to diff against -- running the full pipeline" >&2
+            echo "app_changed=true" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet "$base" "${{ github.sha }}" -- app/ .github/workflows/ci.yml; then
+            echo "app_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "app_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  windows-ci-build-test:
+    needs: ci-build-test-check-dir
+    if: needs.ci-build-test-check-dir.outputs.app_changed != 'false'
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test:run
+
+      - name: Build
+        run: npm run build
+
+  ci-build-test-gate:
+    needs: [ci-build-test-check-dir, windows-ci-build-test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check result
+        shell: bash
+        run: |
+          check_result="${{ needs.ci-build-test-check-dir.result }}"
+          build_result="${{ needs.windows-ci-build-test.result }}"
+          echo "ci-build-test-check-dir: $check_result"
+          echo "windows-ci-build-test: $build_result"
+          if [ "$check_result" != "success" ]; then
+            echo "Gate failed: change-detection job did not succeed"
+            exit 1
+          fi
+          if [ "$build_result" = "success" ] || [ "$build_result" = "skipped" ]; then
+            echo "Gate passed"
+            exit 0
+          else
+            echo "Gate failed: windows-ci-build-test result was $build_result"
+            exit 1
+          fi

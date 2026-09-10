@@ -36,15 +36,37 @@ npm run test:run
 npm run build
 ```
 
-These are exactly what the [PR gate](./.github/workflows/pr-gate.yml) runs, scoped to changes under `app/`. A PR that doesn't touch `app/` skips CI entirely.
+These are exactly what [CI](./.github/workflows/ci.yml) runs, scoped to changes under `app/`. A PR that doesn't touch `app/` (or `ci.yml` itself) skips the build/test job entirely.
 
 ## Pull requests
 
 - Target `main`.
 - Keep the diff scoped to one change; unrelated cleanup belongs in its own PR.
 - Reference the issue the PR resolves, if there is one.
-- Update [CHANGELOG.md](./CHANGELOG.md) under `[Unreleased]` for any user-facing change (new feature, fix, or breaking change) — see that file for format.
+- Update [CHANGELOG.md](./CHANGELOG.md) under `[Unreleased]` in the same PR for any change worth noting — see [CLAUDE.md](./CLAUDE.md#changelogmd) for the exact format (each version splits into `### Release Notes` and `### Contributor Notes`) and the "edit the existing bullet, don't append a new one" rule for changes within the same release cycle.
 
 ## Commit messages
 
 Short, imperative summary line. Explain *why* in the body when it isn't obvious from the diff; the diff already shows *what* changed.
+
+## CI/CD
+
+[`.github/workflows/ci.yml`](./.github/workflows/ci.yml) runs on every pull request and every push to `main`. It's three jobs:
+
+1. **`ci-build-test-check-dir`** — cheap, runs first, diffs the incoming changes against their base and checks whether anything under `app/` or `ci.yml` itself changed.
+2. **`windows-ci-build-test`** — install, lint, typecheck, test, build, on `windows-latest` (matching the primary shipping target from [BUILD_PLAN §1](./docs/BUILD_PLAN.md)). Skipped entirely when the first job found nothing relevant changed (a docs-only PR, for example), so those merge fast.
+3. **`ci-build-test-gate`** — always runs regardless of what the other two did, and is the job meant to act as the required status check: it reports a real pass/fail either way, so a skipped build job still gates green instead of leaving the PR stuck waiting on a check that never ran.
+
+If you're touching `ci.yml` itself, that counts as a relevant change — the pipeline always runs for real on changes to its own file.
+
+## Releasing
+
+1. Rename `## [Unreleased]` to `## [vX.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md`, add a fresh empty `## [Unreleased]` above it, and update the compare-link footer at the bottom of the file (full steps in [CLAUDE.md](./CLAUDE.md#changelogmd)).
+2. Merge that to `main`, then tag the release commit and push the tag:
+   ```
+   git tag -a vX.Y.Z -m "vX.Y.Z"
+   git push origin vX.Y.Z
+   ```
+3. Pushing the tag triggers [`.github/workflows/release.yml`](./.github/workflows/release.yml), which builds the Windows NSIS installer and publishes it to a GitHub Release, with release notes pulled straight from that version's `### Release Notes` section in `CHANGELOG.md`.
+
+Releases are **unsigned** — see [BUILD_PLAN](./docs/BUILD_PLAN.md) §13 for why — so installers trigger a Windows SmartScreen warning ("More info" → "Run anyway" to proceed). This is a deliberate, documented trade-off, not an oversight.
