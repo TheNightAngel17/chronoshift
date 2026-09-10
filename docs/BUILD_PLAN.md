@@ -48,7 +48,7 @@ Do not build these. Do not add dependencies or schema in anticipation of them be
 
 **Do not substitute** any of the above without a comment explaining why.
 
-> **`better-sqlite3` is under active review** — see issue [#4](https://github.com/TheNightAngel17/chronoshift/issues/4). It is a native module, and §13's own risk paragraph names rebuilding it against the Electron ABI as the most common way an Electron + SQLite app works in dev and dies in production. Node now ships `node:sqlite`, which would remove that risk category entirely. **Do not write database code until that ticket closes.**
+> **`better-sqlite3` was challenged and stands** — see issue [#4](https://github.com/TheNightAngel17/chronoshift/issues/4). `node:sqlite` was evaluated against every §6 requirement from inside the Electron 39.2.6 main process and clears all of them: the three pragmas, both exotic indexes (created *and* enforced), transactions and savepoints. It loses on maturity and ergonomics, not capability. On Electron 39 it is Stability 1.1 "Active development" — the whole 39.x major is pinned to Node 22, and the RC promotion landed in Node 25.7 — and it has no equivalent of `db.transaction(fn)` with automatic savepoint nesting, which is the exact primitive §14 requires for every multi-statement mutation and on which §5.1's invariants depend. Revisit only when Electron ships a Node where `node:sqlite` reaches Stability 2.
 
 ## 4. Project structure
 
@@ -667,9 +667,13 @@ npmRebuild: false
 
 `perMachine: false` is the requirement that keeps this installable without admin rights — it lands in `%LOCALAPPDATA%\Programs`. The `portable` target is a useful fallback for locked-down machines.
 
-**Native modules.** If the database layer ends up being `better-sqlite3` (still under review — see §3), it must be rebuilt against the Electron ABI. `postinstall` already runs `electron-builder install-app-deps`; verify the unpacked `.node` binary is present in a packaged build. This is the single most common way an Electron + SQLite app works in dev and dies in production.
+**Native modules — the ABI risk is obsolete, and the mitigation is the bug.** `better-sqlite3` v13 is a Node-API addon that ships prebuilt binaries inside its npm tarball. It installs with no compiler present and loads in Electron 39 with no rebuild — verified in [#4](https://github.com/TheNightAngel17/chronoshift/issues/4) from inside the Electron 39.2.6 main process. The delivery model changed at v13; older advice about rebuilding against the Electron ABI, including the paragraph that used to sit here, predates it. **`npmRebuild: false` above is therefore correct, not an oversight.**
 
-> ⚠️ **`npmRebuild: false` is set above and contradicts that requirement.** It tells electron-builder not to rebuild native dependencies at package time, leaving `postinstall` as the only thing that rebuilds them. That may hold, or may not survive a clean CI checkout. Resolve it in the packaging spike, issue [#6](https://github.com/TheNightAngel17/chronoshift/issues/6), before Phase 9 depends on it. If the database layer ends up needing no native module at all, delete both `npmRebuild` and `asarUnpack`.
+> ⚠️ **The `postinstall` running `electron-builder install-app-deps` is actively broken and should be deleted.** v13 omits a `napi_versions` field, so `@electron/rebuild` fails to recognise it as Node-API, forces a source build anyway, and dies with `Could not find any Visual Studio installation to use` on any machine without build tools. It is trying to rebuild a binary that already works. Removing it is a one-line change and belongs in the Phase 2 database work.
+
+> **`asarUnpack` is redundant but expensive.** electron-builder's `smartUnpack` already unpacks `.node` files without being told. It also unpacks *every* platform's prebuild: roughly 17 MB shipped where only ~1.9 MB is reachable in a Windows x64 build. A `files` exclusion reclaims about 15 MB per installer — worth doing in Phase 9, not before.
+
+Phase 9 must still confirm the **installed** app launches and reaches its database. #4 built the packaged asar layout and confirmed the module loads under the Electron binary, but did not observe the installed executable run end to end — that remains the job of the packaging spike, [#6](https://github.com/TheNightAngel17/chronoshift/issues/6).
 
 **The installer is unsigned, deliberately.** No code-signing certificate is bought for v1. Expect Windows SmartScreen to warn on install (“Windows protected your PC” → More info → Run anyway), and expect some Defender configurations to be noisier still. This is accepted: the app is for personal use and the cost is one extra click. It is written down here so it is not a surprise on the last step of the last phase.
 
