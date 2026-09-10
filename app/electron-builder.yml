@@ -1,0 +1,29 @@
+appId: com.mitchell.chronoshift
+productName: ChronoShift
+directories:
+  output: dist
+  buildResources: resources
+files:
+  - out/**/*
+  - package.json
+asarUnpack:
+  - '**/*.node'
+win:
+  target:
+    - nsis
+    - portable
+  icon: resources/tray-icon.ico
+  executableName: chronoshift
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+mac:
+  target: dmg
+  category: public.app-category.productivity
+linux:
+  target:
+    - AppImage
+  category: Utility
+npmRebuild: false
