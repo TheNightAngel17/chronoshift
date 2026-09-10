@@ -283,6 +283,11 @@ CREATE INDEX idx_segments_started ON segments(started_at);
 CREATE INDEX idx_segments_bucket  ON segments(bucket_id);
 -- Defence-in-depth for "at most one open segment".
 -- Authoritative enforcement is still the transaction in segments repository.
+--
+-- The CASE expression is LOAD-BEARING. Do not "simplify" it to
+--   ON segments(ended_at) WHERE ended_at IS NULL
+-- which is a silent no-op: NULLs are always distinct in a unique index,
+-- so that form happily accepts a second open segment. Verified in #5.
 CREATE UNIQUE INDEX idx_segments_single_open
   ON segments((CASE WHEN ended_at IS NULL THEN 1 END))
   WHERE ended_at IS NULL;
@@ -322,6 +327,17 @@ CREATE TABLE app_state (
 );
 -- Keys in use: 'last_seen_at', 'last_bucket_id', 'clean_shutdown'
 ```
+
+### 6.1 Constraint naming and error mapping
+
+Both indexes above were verified empirically against SQLite 3.49.1 and cross-checked on 3.22.0 (issue [#5](https://github.com/TheNightAngel17/chronoshift/issues/5)). Both enforce exactly what they claim, on insert and on update. Four consequences bind the repository layer:
+
+1. **Name every CHECK constraint.** Write `CONSTRAINT segment_ends_after_start CHECK (...)` rather than a bare `CHECK (...)`. An unnamed CHECK produces error text that *changes between SQLite versions* — 3.22.0 reports the table name, 3.49.1 reports the expression source — so any message-matching code is a time bomb. A named constraint reports its own name on both. **This must land in `001_initial`**: migrations are forward-only, and §6 says never edit a shipped one.
+2. **Map errors on the numeric code plus the constraint name**, never on the driver's error class. Constraint violations arrive as SQLite result code `2067` for `UNIQUE`, `275` for `CHECK`, and `1811` for a foreign key, with the offending index or constraint name in the message text. Some drivers flatten every one of these to a single generic code and message, so the code alone does not identify what failed.
+3. **`FOREIGN KEY constraint failed` identifies nothing** — not the table, not the column, not the row. §5.4 requires a clear message when a bucket cannot be deleted because segments reference it; that message has to be built by querying for the dependants first, not by parsing the error.
+4. **Uniqueness is checked per statement, not deferred to `COMMIT`.** Inside the switch transaction, the outgoing segment must be closed *before* the incoming one is opened, or `idx_segments_single_open` rejects the second insert mid-transaction. The same applies to swapping two sibling bucket names, which cannot be done in a single `UPDATE`.
+
+Also note the sibling-name index is case- and whitespace-sensitive: `Zed`, `zed` and `Zed ` are three distinct buckets. Decide at the repository boundary whether to normalise names on the way in.
 
 Settings are stored **only** here. Do not add `electron-store`, and do not use `localStorage` or `sessionStorage` anywhere in the renderer.
 
