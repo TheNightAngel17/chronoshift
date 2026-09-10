@@ -4,6 +4,10 @@ A background desktop app with a system tray icon that tracks which "bucket" of w
 
 This document is the specification of record. Build to it. Where it is silent, prefer the simplest thing that satisfies the stated invariants, and leave a `// TODO(spec):` comment rather than inventing a behavior that contradicts something here.
 
+**Where things live.** `CONTEXT.md` at the repo root is the glossary — what the words mean. This document is what to build. `docs/adr/` is why a contested choice went the way it did.
+
+**Keeping this honest.** When reality and this document disagree on a structural fact — a path, a version, a name — fix this document; it is not a historical record. When a genuine trade-off is settled, write an ADR and leave a one-line pointer here.
+
 ---
 
 ## 1. Goals
@@ -15,7 +19,7 @@ This document is the specification of record. Build to it. Where it is silent, p
 - A **main window** with two tabs: Review and Configuration.
 - Review shows a **week grid** — days as columns, time running vertically — plus a table view and rollup totals.
 - Time you haven't explicitly confirmed is stored and displayed as **presumed**, not silently treated as fact.
-- Windows is the primary target; macOS and Linux should work from the same codebase.
+- Windows is the primary target. The codebase stays portable and the macOS/Linux builder targets stay configured, but neither is built nor verified for v1 — see §12 Phase 9.
 
 ## 2. Non-goals for v1
 
@@ -36,93 +40,110 @@ Do not build these. Do not add dependencies or schema in anticipation of them be
 | Shell | **Electron** | Tray API, per-user install, cross-platform |
 | Language | **TypeScript**, `strict: true` | Everywhere — main, preload, renderer, shared |
 | Build | **electron-vite** | Handles main/preload/renderer bundling and HMR |
-| UI | **React 18** + plain CSS Modules | No component library, no Tailwind |
+| UI | **React 19** + plain CSS Modules | No component library, no Tailwind |
 | Database | **better-sqlite3** | Synchronous, main process only |
 | Packaging | **electron-builder** | Per-user NSIS on Windows |
 | Dates | **date-fns** | No moment, no dayjs, no luxon |
 | State | React Context + hooks | No Redux/Zustand/Jotai unless it becomes genuinely necessary |
 
-**Do not substitute** any of the above without a comment explaining why. `better-sqlite3` in particular is a native module and the build config depends on it.
+**Do not substitute** any of the above without a comment explaining why.
+
+> **`better-sqlite3` was challenged and stands** — see issue [#4](https://github.com/TheNightAngel17/chronoshift/issues/4). `node:sqlite` was evaluated against every §6 requirement from inside the Electron 39.2.6 main process and clears all of them: the three pragmas, both exotic indexes (created *and* enforced), transactions and savepoints. It loses on maturity and ergonomics, not capability. On Electron 39 it is Stability 1.1 "Active development" — the whole 39.x major is pinned to Node 22, and the RC promotion landed in Node 25.7 — and it has no equivalent of `db.transaction(fn)` with automatic savepoint nesting, which is the exact primitive §14 requires for every multi-statement mutation and on which §5.1's invariants depend. Revisit only when Electron ships a Node where `node:sqlite` reaches Stability 2.
 
 ## 4. Project structure
 
 ```
 /
-├── BUILD_PLAN.md
-├── package.json
-├── electron.vite.config.ts
-├── electron-builder.yml
-├── tsconfig.json
-├── tsconfig.node.json
-├── tsconfig.web.json
-├── .eslintrc.cjs
-├── resources/
-│   ├── tray-icon.png            # 16/32px, template-style for macOS
-│   ├── tray-icon.ico            # Windows
-│   └── app-icon.png
-└── src/
-    ├── shared/                  # imported by BOTH main and renderer — no Node or DOM APIs
-    │   ├── types.ts             # Bucket, Segment, TrackingState, Settings, etc.
-    │   ├── ipc-contract.ts      # channel names + request/response types
-    │   └── time.ts              # pure time helpers (epoch math, day boundaries)
-    ├── preload/
-    │   └── index.ts             # contextBridge surface only
-    ├── main/
-    │   ├── index.ts             # app lifecycle, single-instance lock, wiring
-    │   ├── db/
-    │   │   ├── connection.ts
-    │   │   ├── migrations/
-    │   │   │   ├── index.ts     # forward-only runner
-    │   │   │   └── 001_initial.ts
-    │   │   └── repositories/
-    │   │       ├── buckets.ts
-    │   │       ├── segments.ts
-    │   │       ├── settings.ts
-    │   │       ├── checkins.ts
-    │   │       ├── idleEvents.ts
-    │   │       └── appState.ts
-    │   ├── services/
-    │   │   ├── tracking.ts      # the state machine — see section 5
-    │   │   ├── scheduler.ts     # check-in timer
-    │   │   ├── idleMonitor.ts   # powerMonitor polling + lock/suspend events
-    │   │   ├── heartbeat.ts     # writes last_seen_at
-    │   │   ├── recovery.ts      # startup reconciliation
-    │   │   └── autostart.ts     # login item management
-    │   ├── windows/
-    │   │   ├── mainWindow.ts
-    │   │   └── promptWindow.ts
-    │   ├── tray/
-    │   │   ├── index.ts
-    │   │   └── menu.ts          # rebuilt on every state change
-    │   └── ipc/
-    │       ├── index.ts
-    │       └── handlers/*.ts
-    └── renderer/
-        ├── index.html           # main window entry
-        ├── prompt.html          # prompt window entry
-        └── src/
-            ├── main-app/
-            │   ├── App.tsx      # tab shell
-            │   └── tabs/
-            │       ├── ReviewTab.tsx
-            │       └── ConfigTab.tsx
-            ├── prompt-app/
-            │   ├── App.tsx      # routes on a query param: ?kind=checkin|start|idle|recovery
-            │   ├── StartPrompt.tsx
-            │   ├── CheckinPrompt.tsx
-            │   ├── IdlePrompt.tsx
-            │   └── RecoveryPrompt.tsx
-            ├── components/
-            │   ├── WeekGrid/
-            │   ├── SegmentTable/
-            │   ├── RollupTotals/
-            │   ├── BucketPicker/     # used in prompts — drill-down + typeahead + recents
-            │   ├── BucketTreeEditor/ # used in config
-            │   ├── SinceWhenInput/
-            │   └── SegmentEditModal/
-            ├── hooks/
-            └── styles/
+├── README.md
+├── CLAUDE.md
+├── CONTEXT.md                       # glossary only — what the words mean
+├── docs/
+│   ├── BUILD_PLAN.md                # this document — what to build
+│   ├── adr/                         # why a contested choice went the way it did
+│   └── agents/                      # how agent skills consume this repo
+├── .github/
+│   └── workflows/pr-gate.yml        # lint + test + build, gated on app/ changes
+└── app/                             # the Electron app; every path below is app-relative
+    ├── package.json
+    ├── electron.vite.config.ts
+    ├── electron-builder.yml
+    ├── eslint.config.mjs            # flat config, not .eslintrc.cjs
+    ├── tsconfig.json
+    ├── tsconfig.node.json
+    ├── tsconfig.web.json
+    ├── build/                       # electron-builder scaffold icons — see §13
+    ├── resources/
+    │   ├── tray-icon.png            # 16/32px, template-style for macOS
+    │   ├── tray-icon.ico            # Windows
+    │   ├── icon.png                 # imported by main via ?asset
+    │   └── app-icon.png
+    └── src/
+        ├── shared/                  # imported by BOTH main and renderer — no Node or DOM APIs
+        │   ├── types.ts             # Bucket, Segment, TrackingState, Settings, etc.
+        │   ├── ipc-contract.ts      # channel names + request/response types
+        │   ├── time.ts              # pure time helpers (epoch math, day boundaries)
+        │   ├── tabs.ts              # main window tab definitions          [exists]
+        │   └── startup.ts           # --hidden launch flag parsing         [exists]
+        ├── preload/
+        │   └── index.ts             # contextBridge surface only           [exists]
+        ├── main/
+        │   ├── index.ts             # lifecycle, single-instance lock, wiring  [exists]
+        │   ├── db/
+        │   │   ├── connection.ts
+        │   │   ├── migrations/
+        │   │   │   ├── index.ts     # forward-only runner
+        │   │   │   └── 001_initial.ts
+        │   │   └── repositories/
+        │   │       ├── buckets.ts
+        │   │       ├── segments.ts
+        │   │       ├── settings.ts
+        │   │       ├── checkins.ts
+        │   │       ├── idleEvents.ts
+        │   │       └── appState.ts
+        │   ├── services/
+        │   │   ├── tracking.ts      # the state machine — see section 5
+        │   │   ├── scheduler.ts     # check-in timer
+        │   │   ├── idleMonitor.ts   # powerMonitor polling + lock/suspend events
+        │   │   ├── heartbeat.ts     # writes last_seen_at
+        │   │   ├── recovery.ts      # startup reconciliation
+        │   │   └── autostart.ts     # login item management
+        │   ├── windows/
+        │   │   ├── mainWindow.ts
+        │   │   └── promptWindow.ts
+        │   ├── tray/
+        │   │   ├── index.ts                                                [exists]
+        │   │   └── menu.ts          # rebuilt on every state change         [exists]
+        │   └── ipc/
+        │       ├── index.ts
+        │       └── handlers/*.ts
+        └── renderer/
+            ├── index.html           # main window entry                    [exists]
+            ├── prompt.html          # prompt window entry
+            └── src/
+                ├── main-app/
+                │   ├── App.tsx      # tab shell
+                │   └── tabs/
+                │       ├── ReviewTab.tsx
+                │       └── ConfigTab.tsx
+                ├── prompt-app/
+                │   ├── App.tsx      # routes on ?kind=checkin|start|idle|recovery
+                │   ├── StartPrompt.tsx
+                │   ├── CheckinPrompt.tsx
+                │   ├── IdlePrompt.tsx
+                │   └── RecoveryPrompt.tsx
+                ├── components/
+                │   ├── WeekGrid/
+                │   ├── SegmentTable/
+                │   ├── RollupTotals/
+                │   ├── BucketPicker/     # prompts — drill-down + typeahead + recents
+                │   ├── BucketTreeEditor/ # config
+                │   ├── SinceWhenInput/
+                │   └── SegmentEditModal/
+                ├── hooks/
+                └── styles/
 ```
+
+`[exists]` marks what Phase 1 already built; everything else is still to come. Two Phase-1 scaffold files fall outside this tree and are dealt with when `main-app/` lands: `src/renderer/src/App.tsx` moves to `main-app/App.tsx`, and `src/renderer/src/components/Versions.tsx` is template boilerplate that goes away.
 
 ## 5. Domain model and invariants
 
@@ -262,6 +283,11 @@ CREATE INDEX idx_segments_started ON segments(started_at);
 CREATE INDEX idx_segments_bucket  ON segments(bucket_id);
 -- Defence-in-depth for "at most one open segment".
 -- Authoritative enforcement is still the transaction in segments repository.
+--
+-- The CASE expression is LOAD-BEARING. Do not "simplify" it to
+--   ON segments(ended_at) WHERE ended_at IS NULL
+-- which is a silent no-op: NULLs are always distinct in a unique index,
+-- so that form happily accepts a second open segment. Verified in #5.
 CREATE UNIQUE INDEX idx_segments_single_open
   ON segments((CASE WHEN ended_at IS NULL THEN 1 END))
   WHERE ended_at IS NULL;
@@ -301,6 +327,17 @@ CREATE TABLE app_state (
 );
 -- Keys in use: 'last_seen_at', 'last_bucket_id', 'clean_shutdown'
 ```
+
+### 6.1 Constraint naming and error mapping
+
+Both indexes above were verified empirically against SQLite 3.49.1 and cross-checked on 3.22.0 (issue [#5](https://github.com/TheNightAngel17/chronoshift/issues/5)). Both enforce exactly what they claim, on insert and on update. Four consequences bind the repository layer:
+
+1. **Name every CHECK constraint.** Write `CONSTRAINT segment_ends_after_start CHECK (...)` rather than a bare `CHECK (...)`. An unnamed CHECK produces error text that *changes between SQLite versions* — 3.22.0 reports the table name, 3.49.1 reports the expression source — so any message-matching code is a time bomb. A named constraint reports its own name on both. **This must land in `001_initial`**: migrations are forward-only, and §6 says never edit a shipped one.
+2. **Map errors on the numeric code plus the constraint name**, never on the driver's error class. Constraint violations arrive as SQLite result code `2067` for `UNIQUE`, `275` for `CHECK`, and `1811` for a foreign key, with the offending index or constraint name in the message text. Some drivers flatten every one of these to a single generic code and message, so the code alone does not identify what failed.
+3. **`FOREIGN KEY constraint failed` identifies nothing** — not the table, not the column, not the row. §5.4 requires a clear message when a bucket cannot be deleted because segments reference it; that message has to be built by querying for the dependants first, not by parsing the error.
+4. **Uniqueness is checked per statement, not deferred to `COMMIT`.** Inside the switch transaction, the outgoing segment must be closed *before* the incoming one is opened, or `idx_segments_single_open` rejects the second insert mid-transaction. The same applies to swapping two sibling bucket names, which cannot be done in a single `UPDATE`.
+
+Also note the sibling-name index is case- and whitespace-sensitive: `Zed`, `zed` and `Zed ` are three distinct buckets. Decide at the repository boundary whether to normalise names on the way in.
 
 Settings are stored **only** here. Do not add `electron-store`, and do not use `localStorage` or `sessionStorage` anywhere in the renderer.
 
@@ -347,7 +384,7 @@ Start tracking…            → opens StartPrompt
 Recent: <bucket 1>         → starts immediately, no prompt
 Recent: <bucket 2>
 ─────────
-Open Bucket Tracker
+Open ChronoShift
 Settings…                  → main window, Config tab
 ─────────
 Quit
@@ -361,7 +398,7 @@ Switch bucket…             → opens CheckinPrompt in switch mode
 Take a break               → switches to the system break bucket
 Stop tracking…             → opens CheckinPrompt in stop mode
 ─────────
-Open Bucket Tracker
+Open ChronoShift
 Settings…
 ─────────
 Quit
@@ -437,7 +474,7 @@ Whichever is chosen, write `idle_events.resolution` and `resolved_at`.
 
 ### 9.4 RecoveryPrompt
 
-"Bucket Tracker was last running at 4:52pm yesterday, tracking Acme / Build. That segment is still open." Show last-confirmed time. Actions: end at last confirmed point (default), end at last-seen, end at a time I'll enter, or keep it running.
+"ChronoShift was last running at 4:52pm yesterday, tracking Acme / Build. That segment is still open." Show last-confirmed time. Actions: end at last confirmed point (default), end at last-seen, end at a time I'll enter, or keep it running.
 
 ## 10. Renderer — main window
 
@@ -587,8 +624,10 @@ Drag-move and drag-resize with snapping and overlap clamping. Autostart. Theme. 
 *Accepts when:* dragging cannot produce an overlap or an inverted segment, autostart survives a reboot, and the app is pleasant enough to actually use for a week.
 
 **Phase 9 — Packaging**
-`electron-builder` producing a per-user Windows installer that needs no admin rights. Verify the native module ships correctly.
-*Accepts when:* the installer completes as a standard user, the app launches from the Start menu, the database persists across an upgrade install, and macOS/Linux targets at least build.
+`electron-builder` producing a per-user Windows installer that needs no admin rights. Verify the database layer ships correctly in a packaged build.
+*Accepts when:* the installer completes as a standard user without elevating, the app launches from the Start menu, and the database in `userData` survives an upgrade install.
+
+macOS and Linux are deliberately **not** part of this acceptance. The targets stay configured and the code stays portable, but an unverified build target is a false assurance, so v1 does not claim one.
 
 ## 13. Packaging
 
@@ -604,10 +643,13 @@ files:
   - out/**/*
   - package.json
 asarUnpack:
-  - "**/*.node"
+  - '**/*.node'
 win:
-  target: [nsis, portable]
+  target:
+    - nsis
+    - portable
   icon: resources/tray-icon.ico
+  executableName: chronoshift
 nsis:
   oneClick: false
   perMachine: false                       # per-user install, no admin rights
@@ -617,19 +659,31 @@ mac:
   target: dmg
   category: public.app-category.productivity
 linux:
-  target: [AppImage]
+  target:
+    - AppImage
   category: Utility
+npmRebuild: false
 ```
 
 `perMachine: false` is the requirement that keeps this installable without admin rights — it lands in `%LOCALAPPDATA%\Programs`. The `portable` target is a useful fallback for locked-down machines.
 
-`better-sqlite3` must be rebuilt against the Electron ABI. Add a `postinstall` running `electron-builder install-app-deps` and verify the unpacked `.node` binary is present in a packaged build — this is the single most common way an Electron + SQLite app works in dev and dies in production.
+**Native modules — the ABI risk is obsolete, and the mitigation is the bug.** `better-sqlite3` v13 is a Node-API addon that ships prebuilt binaries inside its npm tarball. It installs with no compiler present and loads in Electron 39 with no rebuild — verified in [#4](https://github.com/TheNightAngel17/chronoshift/issues/4) from inside the Electron 39.2.6 main process. The delivery model changed at v13; older advice about rebuilding against the Electron ABI, including the paragraph that used to sit here, predates it. **`npmRebuild: false` above is therefore correct, not an oversight.**
+
+> ⚠️ **The `postinstall` running `electron-builder install-app-deps` is actively broken and should be deleted.** v13 omits a `napi_versions` field, so `@electron/rebuild` fails to recognise it as Node-API, forces a source build anyway, and dies with `Could not find any Visual Studio installation to use` on any machine without build tools. It is trying to rebuild a binary that already works. Removing it is a one-line change and belongs in the Phase 2 database work.
+
+> **`asarUnpack` is redundant but expensive.** electron-builder's `smartUnpack` already unpacks `.node` files without being told. It also unpacks *every* platform's prebuild: roughly 17 MB shipped where only ~1.9 MB is reachable in a Windows x64 build. A `files` exclusion reclaims about 15 MB per installer — worth doing in Phase 9, not before.
+
+Phase 9 must still confirm the **installed** app launches and reaches its database. #4 built the packaged asar layout and confirmed the module loads under the Electron binary, but did not observe the installed executable run end to end — that remains the job of the packaging spike, [#6](https://github.com/TheNightAngel17/chronoshift/issues/6).
+
+**The installer is unsigned, deliberately.** No code-signing certificate is bought for v1. Expect Windows SmartScreen to warn on install (“Windows protected your PC” → More info → Run anyway), and expect some Defender configurations to be noisier still. This is accepted: the app is for personal use and the cost is one extra click. It is written down here so it is not a surprise on the last step of the last phase.
+
+**Icons need a second look.** `win.icon` points at `resources/tray-icon.ico`, but a tray icon is 16/32px while an installer and Start-menu entry want up to 256px — `resources/app-icon.png` exists for this and is currently unused. Separately, `app/build/` still holds the electron-vite scaffold’s icons while `directories.buildResources` points at `resources/`, so one of those two directories is dead weight. Neither blocks anything before Phase 9.
 
 Autostart via `app.setLoginItemSettings({ openAtLogin, args: ['--hidden'] })`, and honor `--hidden` by not showing the main window on launch.
 
-## 14. Instructions for Copilot
+## 14. Instructions for the implementer
 
-Read these before generating code, and re-read them when touching anything time- or database-related.
+These apply to every lane — a developer at the keyboard, a Claude Code session, or an autonomous Copilot run. Read them before generating code, and re-read them when touching anything time- or database-related.
 
 **Always:**
 - Use TypeScript with `strict: true`. No `any` — use `unknown` and narrow.
