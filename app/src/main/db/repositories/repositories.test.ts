@@ -141,6 +141,9 @@ describe('idleEvents repository', () => {
         expect(created.resolution).toBeNull()
         expect(created.resolvedAt).toBeNull()
         expect(idleEventsModule.getUnresolved(database)).toEqual(created)
+        expect(() => {
+          idleEventsModule.create(4_000, 4_600, 'bad-cause' as never, database)
+        }).toThrowError(/idle_event_cause_valid/)
 
         const resolved = idleEventsModule.resolve(created.id, 'break', 2_700, database)
         expect(resolved.resolution).toBe('break')
@@ -150,6 +153,11 @@ describe('idleEvents repository', () => {
           idleEventsModule.resolve(pending.id, 'kept', 3_500, database)
         }).toThrowError(/resolvedAt must be greater than or equal to endedAt/)
         idleEventsModule.resolve(pending.id, 'kept', 3_700, database)
+        const anotherPending = idleEventsModule.create(5_000, 5_600, 'inactivity', database)
+        expect(() => {
+          idleEventsModule.resolve(anotherPending.id, 'bad-resolution' as never, 5_700, database)
+        }).toThrowError(/idle_event_resolution_valid/)
+        idleEventsModule.resolve(anotherPending.id, 'split', 5_700, database)
         expect(() => {
           idleEventsModule.resolve(created.id, 'kept', 2_800, database)
         }).toThrowError(/already resolved/)
@@ -182,6 +190,36 @@ describe('appState repository', () => {
 
         appStateModule.setLastBucketId(null, database)
         expect(appStateModule.getLastBucketId(database)).toBeNull()
+
+        database
+          .prepare(
+            `
+              INSERT INTO app_state (key, value, updated_at)
+              VALUES (?, ?, ?)
+              ON CONFLICT(key) DO UPDATE SET
+                value = excluded.value,
+                updated_at = excluded.updated_at
+            `
+          )
+          .run('clean_shutdown', 'not-json', Date.now())
+        expect(() => {
+          appStateModule.getCleanShutdown(database)
+        }).toThrowError(/Invalid stored JSON/)
+
+        database
+          .prepare(
+            `
+              INSERT INTO app_state (key, value, updated_at)
+              VALUES (?, ?, ?)
+              ON CONFLICT(key) DO UPDATE SET
+                value = excluded.value,
+                updated_at = excluded.updated_at
+            `
+          )
+          .run('last_seen_at', JSON.stringify('oops'), Date.now())
+        expect(() => {
+          appStateModule.getLastSeenAt(database)
+        }).toThrowError(/integer epoch millisecond value/)
       } finally {
         database.close()
       }
