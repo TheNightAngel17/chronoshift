@@ -52,7 +52,6 @@ export function runMigrations(database: Database.Database): void {
 
     const applyMigration = database.transaction(() => {
       migration.apply(database)
-      database.prepare('DELETE FROM schema_meta').run()
       database
         .prepare(
           `

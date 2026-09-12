@@ -23,8 +23,16 @@ export function openDatabase(databasePath: string): Database.Database {
 
 export function getDatabase(): Database.Database {
   if (database === null) {
-    database = openDatabase(getDatabasePath())
-    runMigrations(database)
+    const connection = openDatabase(getDatabasePath())
+
+    try {
+      runMigrations(connection)
+    } catch (error) {
+      connection.close()
+      throw error
+    }
+
+    database = connection
   }
 
   return database
