@@ -77,12 +77,27 @@ export function resolve(
         UPDATE idle_events
         SET resolution = ?, resolved_at = ?
         WHERE id = ?
+          AND resolved_at IS NULL
       `
     )
     .run(resolution, resolvedAt, id)
 
   if (result.changes === 0) {
-    throw new Error(`Unknown idle event id "${id}"`)
+    const existing = database
+      .prepare<[number], { resolved_at: number | null }>(
+        `
+          SELECT resolved_at
+          FROM idle_events
+          WHERE id = ?
+        `
+      )
+      .get(id)
+
+    if (!existing) {
+      throw new Error(`Unknown idle event id "${id}"`)
+    }
+
+    throw new Error(`Idle event "${id}" is already resolved`)
   }
 
   return getById(id, database)

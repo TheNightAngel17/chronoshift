@@ -108,6 +108,9 @@ describe('checkins repository', () => {
         const responded = checkinsModule.respond(created.id, 1_250, 'timeout', database)
         expect(responded.respondedAt).toBe(1_250)
         expect(responded.response).toBe('timeout')
+        expect(() => {
+          checkinsModule.respond(created.id, 1_300, 'same', database)
+        }).toThrowError(/already has a recorded response/)
 
         expect(checkinsModule.getRecent(1, database)).toEqual([responded])
       } finally {
@@ -133,6 +136,9 @@ describe('idleEvents repository', () => {
         const resolved = idleEventsModule.resolve(created.id, 'break', 2_700, database)
         expect(resolved.resolution).toBe('break')
         expect(resolved.resolvedAt).toBe(2_700)
+        expect(() => {
+          idleEventsModule.resolve(created.id, 'kept', 2_800, database)
+        }).toThrowError(/already resolved/)
         expect(idleEventsModule.getUnresolved(database)).toBeNull()
       } finally {
         database.close()

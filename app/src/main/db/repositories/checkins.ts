@@ -70,12 +70,27 @@ export function respond(
         UPDATE checkins
         SET responded_at = ?, response = ?
         WHERE id = ?
+          AND responded_at IS NULL
       `
     )
     .run(respondedAt, response, id)
 
   if (result.changes === 0) {
-    throw new Error(`Unknown checkin id "${id}"`)
+    const existing = database
+      .prepare<[number], { responded_at: number | null }>(
+        `
+          SELECT responded_at
+          FROM checkins
+          WHERE id = ?
+        `
+      )
+      .get(id)
+
+    if (!existing) {
+      throw new Error(`Unknown checkin id "${id}"`)
+    }
+
+    throw new Error(`Checkin "${id}" already has a recorded response`)
   }
 
   return getById(id, database)
