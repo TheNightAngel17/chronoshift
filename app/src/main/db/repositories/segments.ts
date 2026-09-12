@@ -114,6 +114,21 @@ function getMergedNote(leftNote: string | null, rightNote: string | null): strin
   return leftNote ?? rightNote ?? null
 }
 
+function resolveConfirmedThrough(
+  confirmedThrough: number | null | undefined,
+  fallback: number
+): number | null {
+  return confirmedThrough === undefined ? fallback : confirmedThrough
+}
+
+function isSingleOpenSegmentViolation(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error as { code?: string }).code === 'SQLITE_CONSTRAINT_UNIQUE' &&
+    error.message.includes('idx_segments_single_open')
+  )
+}
+
 export function createSegmentsRepository(database: Database.Database): SegmentsRepository {
   const selectById = database.prepare(
     `
@@ -185,10 +200,10 @@ export function createSegmentsRepository(database: Database.Database): SegmentsR
         AND (ended_at IS NULL OR ended_at > ?)
         AND (
           confirmed_through IS NULL
-          OR confirmed_through < CASE
-            WHEN ended_at IS NULL THEN ?
-            ELSE ended_at
-          END
+          OR confirmed_through < MIN(
+               CASE WHEN ended_at IS NULL THEN ? ELSE ended_at END,
+               ?
+             )
         )
       ORDER BY started_at ASC, id ASC
     `
@@ -230,10 +245,7 @@ export function createSegmentsRepository(database: Database.Database): SegmentsR
         AND (ended_at IS NULL OR ended_at > ?)
         AND (
           confirmed_through IS NULL
-          OR confirmed_through < CASE
-            WHEN ended_at IS NULL THEN ?
-            ELSE ended_at
-          END
+          OR confirmed_through < ?
         )
       ORDER BY started_at ASC, id ASC
     `
@@ -334,7 +346,7 @@ export function createSegmentsRepository(database: Database.Database): SegmentsR
 
   const create = database.transaction((input: CreateSegmentInput): Segment => {
     const now = Date.now()
-    const confirmedThrough = input.confirmedThrough ?? input.endedAt
+    const confirmedThrough = resolveConfirmedThrough(input.confirmedThrough, input.endedAt)
     const origin = input.origin ?? 'manual'
 
     assertClosedRange(input.startedAt, input.endedAt)
@@ -358,21 +370,32 @@ export function createSegmentsRepository(database: Database.Database): SegmentsR
 
   const open = database.transaction((input: OpenSegmentInput): Segment => {
     const now = Date.now()
-    const confirmedThrough = input.confirmedThrough ?? input.startedAt
+    const confirmedThrough = resolveConfirmedThrough(input.confirmedThrough, input.startedAt)
     const origin = input.origin ?? 'manual'
 
     assertConfirmedThroughInRange(input.startedAt, null, confirmedThrough, now)
 
-    const result = insertSegment.run(
-      input.bucketId,
-      input.startedAt,
-      null,
-      confirmedThrough,
-      origin,
-      input.note ?? null,
-      now,
-      now
-    )
+    let result
+    try {
+      result = insertSegment.run(
+        input.bucketId,
+        input.startedAt,
+        null,
+        confirmedThrough,
+        origin,
+        input.note ?? null,
+        now,
+        now
+      )
+    } catch (error) {
+      if (isSingleOpenSegmentViolation(error)) {
+        throw new Error(
+          'idx_segments_single_open: at most one open segment is allowed; close the current one before opening another.'
+        )
+      }
+
+      throw error
+    }
 
     assertTimelineInvariants(now)
 
@@ -381,7 +404,7 @@ export function createSegmentsRepository(database: Database.Database): SegmentsR
 
   const switchSegment = database.transaction((input: SwitchSegmentInput): [Segment, Segment] => {
     const now = Date.now()
-    const incomingConfirmedThrough = input.confirmedThrough ?? input.atMs
+    const incomingConfirmedThrough = resolveConfirmedThrough(input.confirmedThrough, input.atMs)
     const incomingOrigin = input.origin ?? 'manual'
     const outgoing = selectOpenSegment.get() as SegmentRow | undefined
 
@@ -408,16 +431,27 @@ export function createSegmentsRepository(database: Database.Database): SegmentsR
       outgoing.id
     )
 
-    const inserted = insertSegment.run(
-      input.bucketId,
-      input.atMs,
-      null,
-      incomingConfirmedThrough,
-      incomingOrigin,
-      input.note ?? null,
-      now,
-      now
-    )
+    let inserted
+    try {
+      inserted = insertSegment.run(
+        input.bucketId,
+        input.atMs,
+        null,
+        incomingConfirmedThrough,
+        incomingOrigin,
+        input.note ?? null,
+        now,
+        now
+      )
+    } catch (error) {
+      if (isSingleOpenSegmentViolation(error)) {
+        throw new Error(
+          'idx_segments_single_open: at most one open segment is allowed; close the current one before opening another.'
+        )
+      }
+
+      throw error
+    }
 
     assertTimelineInvariants(now)
 
@@ -600,13 +634,15 @@ export function createSegmentsRepository(database: Database.Database): SegmentsR
         return []
       }
 
-      const now = Date.now()
-
       if (toMs === fromMs) {
-        return (selectNeedsReviewAtPoint.all(fromMs, fromMs, now) as SegmentRow[]).map(mapSegment)
+        return (selectNeedsReviewAtPoint.all(fromMs, fromMs, fromMs) as SegmentRow[]).map(
+          mapSegment
+        )
       }
 
-      return (selectNeedsReview.all(toMs, fromMs, now) as SegmentRow[]).map(mapSegment)
+      const now = Date.now()
+
+      return (selectNeedsReview.all(toMs, fromMs, now, toMs) as SegmentRow[]).map(mapSegment)
     }
   }
 }

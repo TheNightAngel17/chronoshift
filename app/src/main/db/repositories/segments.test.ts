@@ -335,4 +335,52 @@ describe('segments repository', () => {
       }
     })
   })
+
+  it('does not flag a segment whose watermark already covers the queried window', () => {
+    withTempDatabase((database) => {
+      const bucketId = insertBucket(database, 'Covered')
+      const repository = createSegmentsRepository(database)
+
+      repository.create({
+        bucketId,
+        startedAt: 1_000,
+        endedAt: 2_000,
+        confirmedThrough: 1_500
+      })
+
+      expect(repository.needsReview(1_000, 1_500)).toHaveLength(0)
+      expect(repository.needsReview(1_250, 1_250)).toHaveLength(0)
+      expect(repository.needsReview(1_600, 1_800)).toHaveLength(1)
+      expect(repository.needsReview(1_600, 1_600)).toHaveLength(1)
+    })
+  })
+
+  it('preserves an explicit null confirmedThrough instead of defaulting it', () => {
+    withTempDatabase((database) => {
+      const bucketId = insertBucket(database, 'Presumed')
+      const repository = createSegmentsRepository(database)
+
+      const created = repository.create({
+        bucketId,
+        startedAt: 1_000,
+        endedAt: 2_000,
+        confirmedThrough: null
+      })
+      expect(created.confirmedThrough).toBeNull()
+
+      const opened = repository.open({
+        bucketId,
+        startedAt: 2_000,
+        confirmedThrough: null
+      })
+      expect(opened.confirmedThrough).toBeNull()
+
+      const [, incoming] = repository.switch({
+        bucketId,
+        atMs: 3_000,
+        confirmedThrough: null
+      })
+      expect(incoming.confirmedThrough).toBeNull()
+    })
+  })
 })
