@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shared domain types and IPC contract (`app/src/shared/types.ts`, `app/src/shared/ipc-contract.ts`) per BUILD_PLAN §11, importable unchanged from both the main and renderer processes.
 - Main-process SQLite connection singleton (`app/src/main/db/connection.ts`) with the required WAL / foreign key / busy-timeout pragmas.
 - Forward-only SQLite migration runner with `schema_meta` version tracking, plus initial schema/setup seeds for buckets, segments, check-ins, idle events, settings, and app state.
+- Buckets repository CRUD logic, including transactional depth/cycle checks, recent-bucket queries, inherited color resolution, and clear delete errors for referenced buckets.
 
 #### Removed
 
