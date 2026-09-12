@@ -3,6 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { hasHiddenLaunchFlag } from '../shared/startup'
+import { registerIpcHandlers } from './ipc'
 import { createTray } from './tray'
 
 let mainWindow: BrowserWindow | null = null
@@ -81,6 +82,7 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
+  registerIpcHandlers()
   mainWindow = createWindow()
   createTray({
     iconPath: icon,
