@@ -24,6 +24,12 @@ function mapIdleEventRow(row: IdleEventRow): IdleEvent {
   }
 }
 
+function assertInteger(value: unknown, name: string): void {
+  if (!Number.isInteger(value)) {
+    throw new Error(`${name} must be an integer`)
+  }
+}
+
 function getById(id: number, database: Database.Database): IdleEvent {
   const row = database
     .prepare<[number], IdleEventRow>(
@@ -48,7 +54,10 @@ export function create(
   cause: IdleCause,
   database: Database.Database = getDatabase()
 ): IdleEvent {
-  if (!Number.isInteger(startedAt) || !Number.isInteger(endedAt) || endedAt <= startedAt) {
+  assertInteger(startedAt, 'startedAt')
+  assertInteger(endedAt, 'endedAt')
+
+  if (endedAt <= startedAt) {
     throw new Error('idle event endedAt must be greater than startedAt')
   }
 
@@ -71,6 +80,14 @@ export function resolve(
   resolvedAt: number,
   database: Database.Database = getDatabase()
 ): IdleEvent {
+  assertInteger(id, 'id')
+  assertInteger(resolvedAt, 'resolvedAt')
+
+  const existing = getById(id, database)
+  if (resolvedAt < existing.endedAt) {
+    throw new Error('resolvedAt must be greater than or equal to endedAt')
+  }
+
   const result = database
     .prepare(
       `
@@ -83,7 +100,7 @@ export function resolve(
     .run(resolution, resolvedAt, id)
 
   if (result.changes === 0) {
-    const existing = database
+    const existingRow = database
       .prepare<[number], { resolved_at: number | null }>(
         `
           SELECT resolved_at
@@ -93,7 +110,7 @@ export function resolve(
       )
       .get(id)
 
-    if (!existing) {
+    if (!existingRow) {
       throw new Error(`Unknown idle event id "${id}"`)
     }
 

@@ -22,6 +22,12 @@ function mapCheckinRow(row: CheckinRow): CheckinRecord {
   }
 }
 
+function assertInteger(value: unknown, name: string): void {
+  if (!Number.isInteger(value)) {
+    throw new Error(`${name} must be an integer`)
+  }
+}
+
 function getById(id: number, database: Database.Database): CheckinRecord {
   const row = database
     .prepare<[number], CheckinRow>(
@@ -45,6 +51,11 @@ export function create(
   promptedAt: number,
   database: Database.Database = getDatabase()
 ): CheckinRecord {
+  if (segmentId !== null) {
+    assertInteger(segmentId, 'segmentId')
+  }
+  assertInteger(promptedAt, 'promptedAt')
+
   const createdAt = Date.now()
   const result = database
     .prepare(
@@ -64,6 +75,14 @@ export function respond(
   response: CheckinResponse,
   database: Database.Database = getDatabase()
 ): CheckinRecord {
+  assertInteger(id, 'id')
+  assertInteger(respondedAt, 'respondedAt')
+
+  const existing = getById(id, database)
+  if (respondedAt < existing.promptedAt) {
+    throw new Error('respondedAt must be greater than or equal to promptedAt')
+  }
+
   const result = database
     .prepare(
       `
@@ -76,7 +95,7 @@ export function respond(
     .run(respondedAt, response, id)
 
   if (result.changes === 0) {
-    const existing = database
+    const existingRow = database
       .prepare<[number], { responded_at: number | null }>(
         `
           SELECT responded_at
@@ -86,7 +105,7 @@ export function respond(
       )
       .get(id)
 
-    if (!existing) {
+    if (!existingRow) {
       throw new Error(`Unknown checkin id "${id}"`)
     }
 

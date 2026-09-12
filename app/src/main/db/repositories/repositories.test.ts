@@ -104,10 +104,19 @@ describe('checkins repository', () => {
         expect(created.promptedAt).toBe(1_000)
         expect(created.respondedAt).toBeNull()
         expect(created.response).toBeNull()
+        expect(() => {
+          checkinsModule.create(1.5, 1_000, database)
+        }).toThrowError(/segmentId must be an integer/)
+        expect(() => {
+          checkinsModule.create(null, 1_000.5, database)
+        }).toThrowError(/promptedAt must be an integer/)
 
         const responded = checkinsModule.respond(created.id, 1_250, 'timeout', database)
         expect(responded.respondedAt).toBe(1_250)
         expect(responded.response).toBe('timeout')
+        expect(() => {
+          checkinsModule.respond(created.id, 999, 'same', database)
+        }).toThrowError(/respondedAt must be greater than or equal to promptedAt/)
         expect(() => {
           checkinsModule.respond(created.id, 1_300, 'same', database)
         }).toThrowError(/already has a recorded response/)
@@ -136,6 +145,11 @@ describe('idleEvents repository', () => {
         const resolved = idleEventsModule.resolve(created.id, 'break', 2_700, database)
         expect(resolved.resolution).toBe('break')
         expect(resolved.resolvedAt).toBe(2_700)
+        const pending = idleEventsModule.create(3_000, 3_600, 'suspend', database)
+        expect(() => {
+          idleEventsModule.resolve(pending.id, 'kept', 3_500, database)
+        }).toThrowError(/resolvedAt must be greater than or equal to endedAt/)
+        idleEventsModule.resolve(pending.id, 'kept', 3_700, database)
         expect(() => {
           idleEventsModule.resolve(created.id, 'kept', 2_800, database)
         }).toThrowError(/already resolved/)
