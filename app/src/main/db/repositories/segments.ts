@@ -14,6 +14,8 @@ type SegmentRow = {
   updated_at: number
 }
 
+const SEGMENT_PATCH_KEYS = new Set(['bucketId', 'startedAt', 'endedAt', 'confirmedThrough', 'note'])
+
 export interface CreateSegmentInput {
   bucketId: number
   startedAt: number
@@ -383,6 +385,12 @@ export function createSegmentsRepository(database: Database.Database): SegmentsR
   const update = database.transaction((id: number, patch: SegmentPatch): Segment => {
     const existing = getSegmentOrThrow(id)
 
+    const unsupportedKeys = Object.keys(patch).filter((key) => !SEGMENT_PATCH_KEYS.has(key))
+
+    if (unsupportedKeys.length > 0) {
+      throw new Error(`Unsupported segment update field(s): ${unsupportedKeys.join(', ')}.`)
+    }
+
     if (Object.keys(patch).length === 0) {
       return mapSegment(existing)
     }
@@ -500,6 +508,7 @@ export function createSegmentsRepository(database: Database.Database): SegmentsR
       left.started_at,
       right.ended_at,
       mergedConfirmedThrough,
+      // BUILD_PLAN §10.1 makes merge provenance explicit: the merged row is an edit.
       'edit',
       mergedNote,
       now,

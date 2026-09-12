@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { openDatabase } from '../connection'
 import { runMigrations } from '../migrations'
+import type { SegmentPatch } from '../../../shared/ipc-contract'
 import { createSegmentsRepository } from './segments'
 
 function withTempDatabase(run: (database: Database.Database) => void): void {
@@ -189,6 +190,18 @@ describe('segments repository', () => {
     })
   })
 
+  it('rejects unsupported update fields at the repository boundary', () => {
+    withTempDatabase((database) => {
+      const bucketId = insertBucket(database, 'Patch Boundary')
+      const repository = createSegmentsRepository(database)
+      const segment = repository.create({ bucketId, startedAt: 1_000, endedAt: 2_000 })
+
+      expect(() =>
+        repository.update(segment.id, { origin: 'split' } as unknown as SegmentPatch)
+      ).toThrow(/Unsupported segment update field/)
+    })
+  })
+
   it('splits with the §10.1 formula branch where the watermark crosses the split, then merges back', () => {
     withTempDatabase((database) => {
       const bucketId = insertBucket(database, 'Worked Example')
@@ -243,6 +256,29 @@ describe('segments repository', () => {
 
       expect(first.confirmedThrough).toBe(120)
       expect(second.confirmedThrough).toBeNull()
+    })
+  })
+
+  it('rewrites mixed origins to edit when adjacent segments merge', () => {
+    withTempDatabase((database) => {
+      const bucketId = insertBucket(database, 'Merge Origins')
+      const repository = createSegmentsRepository(database)
+      const leftId = insertSegment(database, {
+        bucketId,
+        startedAt: 100,
+        endedAt: 150,
+        confirmedThrough: 150,
+        origin: 'manual'
+      })
+      const rightId = insertSegment(database, {
+        bucketId,
+        startedAt: 150,
+        endedAt: 200,
+        confirmedThrough: 200,
+        origin: 'checkin'
+      })
+
+      expect(repository.merge(leftId, rightId).origin).toBe('edit')
     })
   })
 
