@@ -207,6 +207,12 @@ describe('bucket IPC handlers', () => {
         error: 'patch contains unsupported field(s): notAllowed.'
       })
 
+      const emptyPatch = await invoke(IpcInvokeChannel.bucketsUpdate, 1, {})
+      expect(emptyPatch).toEqual({
+        ok: false,
+        error: 'patch must include at least one supported field.'
+      })
+
       const badMove = await invoke(IpcInvokeChannel.bucketsMove, 1, null, -1)
       expect(badMove).toEqual({
         ok: false,

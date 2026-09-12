@@ -72,7 +72,13 @@ function validatePatch(patch: unknown): string | null {
   }
 
   const allowedKeys = new Set(['name', 'color'])
-  const unknownKeys = Object.keys(patch).filter((key) => !allowedKeys.has(key))
+  const patchKeys = Object.keys(patch)
+
+  if (patchKeys.length === 0) {
+    return 'patch must include at least one supported field.'
+  }
+
+  const unknownKeys = patchKeys.filter((key) => !allowedKeys.has(key))
 
   if (unknownKeys.length > 0) {
     return `patch contains unsupported field(s): ${unknownKeys.join(', ')}.`
