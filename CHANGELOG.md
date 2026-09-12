@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Forward-only SQLite migration runner with `schema_meta` version tracking, plus initial schema/setup seeds for buckets, segments, check-ins, idle events, settings, and app state.
 - Buckets repository CRUD logic, including transactional depth/cycle checks, recent-bucket queries, inherited color resolution, and clear delete errors for referenced buckets.
 - Main-process segments repository (`app/src/main/db/repositories/segments.ts`) enforcing the BUILD_PLAN §5.1/§5.2 timeline invariants (single open segment, no overlaps, watermark ranges) with `create`/`open`/`switch`/`update`/`split`/`merge`/`range`/`needsReview` primitives.
+- Settings, check-ins, idle events, and app-state repositories (`app/src/main/db/repositories/{settings,checkins,idleEvents,appState}.ts`) providing typed CRUD and §7 settings validation over those tables.
 
 #### Removed
 
