@@ -342,13 +342,14 @@ export class BucketsRepository {
           SELECT bucket.*
           FROM buckets bucket
           INNER JOIN (
-            SELECT bucket_id, MAX(started_at) AS last_started_at
-            FROM segments
-            GROUP BY bucket_id
-            ORDER BY last_started_at DESC, bucket_id DESC
+            SELECT segment.bucket_id, MAX(segment.started_at) AS last_started_at
+            FROM segments segment
+            INNER JOIN buckets active_bucket
+              ON active_bucket.id = segment.bucket_id AND active_bucket.is_archived = 0
+            GROUP BY segment.bucket_id
+            ORDER BY last_started_at DESC, segment.bucket_id DESC
             LIMIT ?
           ) recent ON recent.bucket_id = bucket.id
-          WHERE bucket.is_archived = 0
           ORDER BY recent.last_started_at DESC, bucket.id DESC
         `
       )

@@ -188,4 +188,25 @@ describe('BucketsRepository', () => {
       ])
     })
   })
+
+  it('backfills recents past an archived bucket instead of returning fewer than the limit', () => {
+    withRepository((repository, database) => {
+      const archived = repository.create(null, 'Archived')
+      const active = repository.create(null, 'Active')
+      const now = Date.now()
+
+      const insertSegment = database.prepare(
+        `
+          INSERT INTO segments (bucket_id, started_at, ended_at, origin, created_at, updated_at)
+          VALUES (?, ?, ?, 'manual', ?, ?)
+        `
+      )
+
+      insertSegment.run(active.id, now - 20_000, now - 10_000, now, now)
+      insertSegment.run(archived.id, now - 10_000, now - 5_000, now, now)
+      repository.archive(archived.id, true)
+
+      expect(repository.recents(1).map((bucket) => bucket.id)).toEqual([active.id])
+    })
+  })
 })
