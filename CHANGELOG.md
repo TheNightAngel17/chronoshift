@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Contributor Notes
+
+#### Added
+
+- Shared domain types and IPC contract (`app/src/shared/types.ts`, `app/src/shared/ipc-contract.ts`) per BUILD_PLAN §11, importable unchanged from both the main and renderer processes.
+
 ## [v0.0.0] - 2026-09-10
 
 ### Release Notes
