@@ -194,6 +194,51 @@ export function createSegmentsRepository(database: Database.Database): SegmentsR
     `
   )
 
+  const selectPointInTime = database.prepare(
+    `
+      SELECT
+        id,
+        bucket_id,
+        started_at,
+        ended_at,
+        confirmed_through,
+        origin,
+        note,
+        created_at,
+        updated_at
+      FROM segments
+      WHERE started_at <= ?
+        AND (ended_at IS NULL OR ended_at > ?)
+      ORDER BY started_at ASC, id ASC
+    `
+  )
+
+  const selectNeedsReviewAtPoint = database.prepare(
+    `
+      SELECT
+        id,
+        bucket_id,
+        started_at,
+        ended_at,
+        confirmed_through,
+        origin,
+        note,
+        created_at,
+        updated_at
+      FROM segments
+      WHERE started_at <= ?
+        AND (ended_at IS NULL OR ended_at > ?)
+        AND (
+          confirmed_through IS NULL
+          OR confirmed_through < CASE
+            WHEN ended_at IS NULL THEN ?
+            ELSE ended_at
+          END
+        )
+      ORDER BY started_at ASC, id ASC
+    `
+  )
+
   const selectOpenSegment = database.prepare(
     `
       SELECT
@@ -533,8 +578,12 @@ export function createSegmentsRepository(database: Database.Database): SegmentsR
 
   return {
     range(fromMs, toMs) {
-      if (toMs <= fromMs) {
+      if (toMs < fromMs) {
         return []
+      }
+
+      if (toMs === fromMs) {
+        return (selectPointInTime.all(fromMs, fromMs) as SegmentRow[]).map(mapSegment)
       }
 
       return (selectRange.all(toMs, fromMs) as SegmentRow[]).map(mapSegment)
@@ -547,11 +596,15 @@ export function createSegmentsRepository(database: Database.Database): SegmentsR
     merge,
     delete: remove,
     needsReview(fromMs, toMs) {
-      if (toMs <= fromMs) {
+      if (toMs < fromMs) {
         return []
       }
 
       const now = Date.now()
+
+      if (toMs === fromMs) {
+        return (selectNeedsReviewAtPoint.all(fromMs, fromMs, now) as SegmentRow[]).map(mapSegment)
+      }
 
       return (selectNeedsReview.all(toMs, fromMs, now) as SegmentRow[]).map(mapSegment)
     }

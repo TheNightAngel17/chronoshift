@@ -90,6 +90,7 @@ describe('segments repository', () => {
       expect(repository.range(5_000, 15_000).map((segment) => segment.startedAt)).toEqual([
         0, 10_000
       ])
+      expect(repository.range(15_000, 15_000).map((segment) => segment.startedAt)).toEqual([10_000])
     })
   })
 
@@ -328,6 +329,7 @@ describe('segments repository', () => {
         })
 
         expect(repository.needsReview(0, 4_000)).toHaveLength(1)
+        expect(repository.needsReview(1_750, 1_750)).toHaveLength(1)
       } finally {
         vi.useRealTimers()
       }
