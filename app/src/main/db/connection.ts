@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'node:path'
+import { runMigrations } from './migrations'
 
 const DATABASE_FILENAME = 'timetracker.db'
 
@@ -23,6 +24,7 @@ export function openDatabase(databasePath: string): Database.Database {
 export function getDatabase(): Database.Database {
   if (database === null) {
     database = openDatabase(getDatabasePath())
+    runMigrations(database)
   }
 
   return database
