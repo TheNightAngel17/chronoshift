@@ -22,6 +22,16 @@ _Avoid_: unassigned time, empty time, idle time
 Giving a state change an effective time earlier than now, so that "I switched at 09:40" records the switch at 09:40 rather than when you said so.
 _Avoid_: retroactive edit, since-when, rewind
 
+### Tracking
+
+**Tracking state**:
+Whether a segment is currently open: `not_tracking` or `tracking`. There are exactly two states — "on break" is not a third; it's the tray deriving a display concern from the open segment's bucket, not a branch the state machine itself takes. See [ADR 0001](./docs/adr/0001-break-is-not-a-tracking-state.md).
+_Avoid_: idle state, on-break state, paused
+
+**Idle-unresolved**:
+Whether an open idle event is waiting on a resolution. It's a flag that can hold alongside either tracking state, not a state of its own — check-ins are suppressed while it's set, but the machine doesn't branch on it.
+_Avoid_: idle state, pending idle
+
 ### Attribution
 
 **Bucket**:
