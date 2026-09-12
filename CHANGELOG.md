@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Pure epoch-ms day/week boundary helpers (`app/src/shared/time.ts`), built on `date-fns` per BUILD_PLAN §5.5 — no hand-rolled DST arithmetic.
 
+#### Changed
+
+- Added the main-process SQLite connection singleton with the required WAL / foreign key / busy-timeout pragmas, and removed the broken `postinstall` rebuild step so `better-sqlite3` v13 uses its bundled prebuilds as intended.
+
 ## [v0.0.0] - 2026-09-10
 
 ### Release Notes
