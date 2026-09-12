@@ -104,6 +104,14 @@ function getLaterConfirmation(a: number | null, b: number | null): number | null
   return Math.max(a, b)
 }
 
+function getMergedNote(leftNote: string | null, rightNote: string | null): string | null {
+  if (leftNote !== null && rightNote !== null && leftNote !== rightNote) {
+    throw new Error('Cannot merge segments with conflicting notes until the spec defines the rule.')
+  }
+
+  return leftNote ?? rightNote ?? null
+}
+
 export function createSegmentsRepository(database: Database.Database): SegmentsRepository {
   const selectById = database.prepare(
     `
@@ -335,6 +343,11 @@ export function createSegmentsRepository(database: Database.Database): SegmentsR
     }
 
     assertClosedRange(outgoing.started_at, input.atMs)
+
+    if (outgoing.confirmed_through !== null && input.atMs < outgoing.confirmed_through) {
+      throw new Error("Cannot switch before the current segment's confirmed_through watermark.")
+    }
+
     assertConfirmedThroughInRange(input.atMs, null, incomingConfirmedThrough, now)
 
     updateSegment.run(
@@ -479,8 +492,8 @@ export function createSegmentsRepository(database: Database.Database): SegmentsR
       left.confirmed_through,
       right.confirmed_through
     )
-    // TODO(spec): Define how differing segment notes should merge in the review modal.
-    const mergedNote = left.note === right.note ? left.note : (left.note ?? right.note ?? null)
+    // TODO(spec): Define whether conflicting notes should be combined once the review modal lands.
+    const mergedNote = getMergedNote(left.note, right.note)
 
     updateSegment.run(
       left.bucket_id,

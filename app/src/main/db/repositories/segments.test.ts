@@ -137,6 +137,58 @@ describe('segments repository', () => {
     })
   })
 
+  it('rejects switching before the current confirmation watermark', () => {
+    withTempDatabase((database) => {
+      const firstBucketId = insertBucket(database, 'Gamma')
+      const secondBucketId = insertBucket(database, 'Delta')
+      const repository = createSegmentsRepository(database)
+
+      repository.open({ bucketId: firstBucketId, startedAt: 1_000, confirmedThrough: 2_500 })
+
+      expect(() =>
+        repository.switch({ bucketId: secondBucketId, atMs: 2_000, confirmedThrough: 2_000 })
+      ).toThrow(/confirmed_through watermark/)
+    })
+  })
+
+  it('updates a segment and rejects invalid update invariants', () => {
+    withTempDatabase((database) => {
+      const bucketId = insertBucket(database, 'Editable')
+      const repository = createSegmentsRepository(database)
+
+      const first = repository.create({ bucketId, startedAt: 1_000, endedAt: 2_000 })
+      const second = repository.create({ bucketId, startedAt: 3_000, endedAt: 4_000 })
+
+      const updated = repository.update(second.id, {
+        startedAt: 4_000,
+        endedAt: 5_000,
+        confirmedThrough: 4_500,
+        note: 'moved'
+      })
+
+      expect(updated).toMatchObject({
+        startedAt: 4_000,
+        endedAt: 5_000,
+        confirmedThrough: 4_500,
+        note: 'moved'
+      })
+
+      expect(() =>
+        repository.update(updated.id, {
+          startedAt: 1_500,
+          endedAt: 2_500,
+          confirmedThrough: 2_000
+        })
+      ).toThrow(/overlap/i)
+
+      expect(() =>
+        repository.update(first.id, {
+          confirmedThrough: 2_500
+        })
+      ).toThrow(/inside the segment range/)
+    })
+  })
+
   it('splits with the §10.1 formula branch where the watermark crosses the split, then merges back', () => {
     withTempDatabase((database) => {
       const bucketId = insertBucket(database, 'Worked Example')
@@ -170,7 +222,8 @@ describe('segments repository', () => {
         startedAt: 100,
         endedAt: 200,
         confirmedThrough: 180,
-        origin: 'edit'
+        origin: 'edit',
+        note: 'kept'
       })
     })
   })
@@ -190,6 +243,29 @@ describe('segments repository', () => {
 
       expect(first.confirmedThrough).toBe(120)
       expect(second.confirmedThrough).toBeNull()
+    })
+  })
+
+  it('rejects merging conflicting notes until the spec defines the behavior', () => {
+    withTempDatabase((database) => {
+      const bucketId = insertBucket(database, 'Conflicting Notes')
+      const repository = createSegmentsRepository(database)
+      const leftId = insertSegment(database, {
+        bucketId,
+        startedAt: 100,
+        endedAt: 150,
+        confirmedThrough: 150,
+        note: 'left'
+      })
+      const rightId = insertSegment(database, {
+        bucketId,
+        startedAt: 150,
+        endedAt: 200,
+        confirmedThrough: 200,
+        note: 'right'
+      })
+
+      expect(() => repository.merge(leftId, rightId)).toThrow(/conflicting notes/)
     })
   })
 
