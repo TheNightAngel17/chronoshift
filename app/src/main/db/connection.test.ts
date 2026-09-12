@@ -54,6 +54,7 @@ describe('openDatabase', () => {
       expect(firstConnection).toBe(secondConnection)
       expect(firstConnection.name).toBe(join(tempDirectory, 'timetracker.db'))
     } finally {
+      connectionModule.resetDatabaseForTests()
       rmSync(tempDirectory, { recursive: true, force: true })
     }
   })
