@@ -61,8 +61,13 @@ Do not build these. Do not add dependencies or schema in anticipation of them be
 │   ├── BUILD_PLAN.md                # this document — what to build
 │   ├── adr/                         # why a contested choice went the way it did
 │   └── agents/                      # how agent skills consume this repo
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+├── LICENSE
 ├── .github/
-│   └── workflows/pr-gate.yml        # lint + test + build, gated on app/ changes
+│   └── workflows/
+│       ├── ci.yml                   # lint + test + build, gated on app/ changes
+│       └── release.yml              # tag push -> Windows installer + GitHub Release
 └── app/                             # the Electron app; every path below is app-relative
     ├── package.json
     ├── electron.vite.config.ts
