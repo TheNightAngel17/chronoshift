@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
-import { MAIN_TABS, type MainTabId } from '../../shared/tabs'
+import { MAIN_TABS, type MainTabId } from '../../../shared/tabs'
+import ConfigTab from './tabs/ConfigTab'
+import ReviewTab from './tabs/ReviewTab'
 import styles from './App.module.css'
 
 function App(): React.JSX.Element {
@@ -12,14 +14,8 @@ function App(): React.JSX.Element {
   return (
     <main className={styles.shell}>
       <header className={styles.header}>
-        <div>
-          <p className={styles.eyebrow}>ChronoShift</p>
-          <h1 className={styles.title}>Local-first time tracking</h1>
-          <p className={styles.subtitle}>
-            Phase 1 is in place with the main application shell, ready for the tracking workflows to
-            be built out next.
-          </p>
-        </div>
+        <p className={styles.eyebrow}>ChronoShift</p>
+        <h1 className={styles.title}>Local-first time tracking</h1>
       </header>
 
       <nav aria-label="Primary" className={styles.tabs}>
@@ -28,7 +24,9 @@ function App(): React.JSX.Element {
             key={tab.id}
             className={tab.id === activeTab ? styles.activeTab : styles.tab}
             type="button"
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => {
+              setActiveTab(tab.id)
+            }}
           >
             {tab.label}
           </button>
@@ -38,9 +36,7 @@ function App(): React.JSX.Element {
       <section className={styles.panel}>
         <h2 className={styles.panelTitle}>{activePanel.label}</h2>
         <p className={styles.panelDescription}>{activePanel.description}</p>
-        <div className={styles.placeholder}>
-          Empty state for the {activePanel.label.toLowerCase()} tab.
-        </div>
+        {activePanel.id === 'configuration' ? <ConfigTab /> : <ReviewTab />}
       </section>
     </main>
   )

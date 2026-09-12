@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Release Notes
+
+#### Added
+
+- The Configuration tab now has a bucket tree editor: create buckets, rename them, move them up and down, reparent them, pick their color, archive them, and delete the ones no time has been tracked against. Nesting stops at four levels, and the built-in "Break / Away" bucket only lets you change its color.
+
 ### Contributor Notes
 
 #### Added
