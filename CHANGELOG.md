@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Contributor Notes
+
+#### Added
+
+- Pure epoch-ms day/week boundary helpers (`app/src/shared/time.ts`), built on `date-fns` per BUILD_PLAN §5.5 — no hand-rolled DST arithmetic.
+
 ## [v0.0.0] - 2026-09-10
 
 ### Release Notes
