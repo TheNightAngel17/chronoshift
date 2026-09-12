@@ -39,10 +39,6 @@ function BucketTreeEditor(): React.JSX.Element {
     setTree(result.data)
   }, [])
 
-  const loadTree = useCallback(async (): Promise<void> => {
-    applyTreeResult(await window.api.buckets.tree())
-  }, [applyTreeResult])
-
   useEffect(() => {
     let cancelled = false
 
@@ -58,29 +54,34 @@ function BucketTreeEditor(): React.JSX.Element {
   }, [applyTreeResult])
 
   /**
-   * Runs one editing operation and reloads the tree. A rejected `Result` is
-   * surfaced with the main process's own message — never paraphrased (§5.4).
+   * Runs one editing operation, then reloads the tree regardless of outcome —
+   * an operation built from several IPC calls (e.g. `reorder`) can fail
+   * partway through, and the UI must reflect whatever partial state actually
+   * landed rather than the pre-operation tree. The reload's own error never
+   * overwrites a genuine operation failure.
    */
-  const run = useCallback(
-    async (operation: () => Promise<Result<unknown>>): Promise<boolean> => {
-      setBusy(true)
+  const run = useCallback(async (operation: () => Promise<Result<unknown>>): Promise<boolean> => {
+    setBusy(true)
 
-      try {
-        const result = await operation()
+    try {
+      const result = await operation()
+      const refreshed = await window.api.buckets.tree()
 
-        if (!result.ok) {
-          setError(result.error)
-          return false
-        }
-
-        await loadTree()
-        return true
-      } finally {
-        setBusy(false)
+      if (refreshed.ok) {
+        setTree(refreshed.data)
       }
-    },
-    [loadTree]
-  )
+
+      if (!result.ok) {
+        setError(result.error)
+        return false
+      }
+
+      setError(refreshed.ok ? null : refreshed.error)
+      return refreshed.ok
+    } finally {
+      setBusy(false)
+    }
+  }, [])
 
   const rows = useMemo(() => (tree === null ? [] : flattenBucketTree(tree)), [tree])
   const rootSiblings = tree ?? []
@@ -93,7 +94,27 @@ function BucketTreeEditor(): React.JSX.Element {
       return
     }
 
-    const created = await run(() => window.api.buckets.create(draft.parentId, name))
+    // `buckets:create` always lands a new bucket at `sort_order = 0`, which
+    // would put it ahead of any already-reordered sibling — append it to the
+    // end of the group instead, the same way `reparent` does.
+    const siblings =
+      draft.parentId === null
+        ? rootSiblings
+        : (rows.find((candidate) => candidate.node.id === draft.parentId)?.node.children ?? [])
+
+    const created = await run(async () => {
+      const createdBucket = await window.api.buckets.create(draft.parentId, name)
+
+      if (!createdBucket.ok) {
+        return createdBucket
+      }
+
+      return window.api.buckets.move(
+        createdBucket.data.id,
+        draft.parentId,
+        appendSortOrder(siblings)
+      )
+    })
 
     if (created) {
       setCreateDraft(null)

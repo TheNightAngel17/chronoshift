@@ -195,12 +195,6 @@ export type IpcInvoker<Channel extends IpcInvokeChannelName> = (
   ...args: IpcInvokeMap[Channel]['params']
 ) => Promise<IpcInvokeMap[Channel]['result']>
 
-/** Generic escape hatch: invoke any channel with its contract-checked arguments. */
-export type IpcInvokeFn = <Channel extends IpcInvokeChannelName>(
-  channel: Channel,
-  ...args: IpcInvokeMap[Channel]['params']
-) => Promise<IpcInvokeMap[Channel]['result']>
-
 /** The `buckets:*` slice of the preload bridge (§5.4, §11). */
 export interface BucketsApi {
   tree: IpcInvoker<typeof IpcInvokeChannel.bucketsTree>
@@ -217,7 +211,6 @@ export interface BucketsApi {
  * renderer never touches `ipcRenderer` directly; it goes through this.
  */
 export interface ChronoShiftApi {
-  invoke: IpcInvokeFn
   buckets: BucketsApi
 }
 

@@ -19,7 +19,6 @@ function invoke<Channel extends IpcInvokeChannelName>(
 
 // Custom APIs for renderer
 const api: ChronoShiftApi = {
-  invoke,
   buckets: {
     tree: () => invoke(IpcInvokeChannel.bucketsTree),
     create: (parentId, name, color) =>
