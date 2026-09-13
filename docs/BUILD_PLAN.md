@@ -714,15 +714,19 @@ These apply to every lane — a developer at the keyboard, a Claude Code session
 
 ## 15. Testing notes
 
-Unit tests are worth writing for exactly three things, because they're where the bugs hide:
+Three tiers, in the sense CONTRIBUTING.md's Testing section spells out in full — this section covers what's specific to this app rather than the taxonomy itself.
+
+**Unit** (`src/**/*.test.ts`, no DB, no Electron) is worth writing for exactly three things beyond ordinary function coverage, because they're where the bugs hide:
 
 1. **Segment invariants** — a property-style test that applies a long random sequence of start/switch/stop/split/merge/edit operations and asserts after each that there are no overlaps, at most one open segment, no zero-length segments, and every `confirmed_through` in range.
 2. **Watermark arithmetic** — the section 5.2 worked example plus the split and merge rules, as explicit cases.
 3. **Clamping** — every "since when" rule from section 5.6, including the awkward ones.
 
-Everything else is better verified by using the app. Use `vitest`; skip renderer component tests for v1.
+Skip renderer component tests for v1 — that's what the e2e tier below is for.
 
-**Integration tests** (`app/tests/e2e/`, Playwright's Electron driver) are a separate layer from the above, not a substitute for it or an exception to "skip renderer component tests": they launch the real built app against a seeded database, drive it through the UI, and reopen the database afterward to assert what actually got written — automating the "use the app" manual check for flows worth re-running on every change (BUILD_PLAN §12's per-phase manual-acceptance criteria are natural candidates), rather than testing a component's rendering in isolation. Local-only via `npm run test:e2e` for now; not part of the CI gate.
+**Integration** (`src/**/*.integration.test.ts`, colocated with the module it tests, real sqlite, no Electron) is where business-rule coverage belongs: repository methods and IPC handlers exercised against an in-memory or temp-file database. This is the tier "everything a user can do" mostly lands on, since it's fast (no Electron process) and exercises the real code path a click ultimately reaches.
+
+**E2e** (`app/tests/e2e/`, Playwright's Electron driver, one `project` per renderer surface — `configuration`, `tracker`, `review`) launches the real built app against a seeded, isolated database, drives it through the UI, then reopens that database file to assert what actually got written. This automates the "use the app" manual check for flows worth re-running on every change (BUILD_PLAN §12's per-phase manual-acceptance criteria are natural candidates) — but it's deliberately the *thin* top of the pyramid: a handful of realistic multi-step flows per area (seed → launch → interact/assert × N → cleanup) hitting each affordance at least once, not exhaustive per-button coverage — that volume belongs at the integration tier instead, where it's an order of magnitude cheaper to run. Projects map to renderer surfaces, not tabs: `tracker` covers the tray menu (§8.2) and the four prompt windows (§9) plus `BucketPicker` (§10.3) — none of that is a tab at all. Local-only via `npm run test:e2e` for now, with a `workflow_dispatch`-only Actions job to run on demand; not part of the CI gate yet.
 
 ## 16. Deferred, with hooks already in place
 

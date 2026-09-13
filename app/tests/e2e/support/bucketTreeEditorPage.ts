@@ -66,6 +66,83 @@ export async function archiveBucket(window: Page, bucketName: string): Promise<v
   await window.waitForTimeout(300)
 }
 
+export async function moveBucketUp(window: Page, bucketName: string): Promise<void> {
+  await window.getByRole('button', { name: `Move ${bucketName} up` }).click()
+  await window.waitForTimeout(300)
+}
+
+export async function moveBucketDown(window: Page, bucketName: string): Promise<void> {
+  await window.getByRole('button', { name: `Move ${bucketName} down` }).click()
+  await window.waitForTimeout(300)
+}
+
+/**
+ * Reparents `bucketName` to `targetParentName` (or top level, if `null`) via
+ * the row's own `<select>`. Options are keyed by bucket id, and labelled with
+ * a depth-indent prefix (`'— '.repeat(depth) + name`), so this resolves the
+ * right `<option>` by its trimmed label rather than guessing the id or the
+ * exact indented string.
+ */
+export async function reparentBucket(
+  window: Page,
+  bucketName: string,
+  targetParentName: string | null
+): Promise<void> {
+  const select = window.getByLabel(`Parent of ${bucketName}`)
+  const optionValue = await select.evaluate((el, targetParentName) => {
+    const selectEl = el as HTMLSelectElement
+    if (targetParentName === null) return 'top-level'
+    const option = Array.from(selectEl.options).find(
+      (o) => o.textContent?.replace(/^(?:— )+/, '') === targetParentName
+    )
+    return option?.value ?? null
+  }, targetParentName)
+
+  if (optionValue === null) {
+    throw new Error(`reparentBucket(${bucketName}): no selectable option for "${targetParentName}"`)
+  }
+
+  await select.selectOption(optionValue)
+  await window.waitForTimeout(300)
+}
+
+/**
+ * Sets a bucket's own color via its `<input type="color">`. Playwright's
+ * `.fill()` refuses non-text input types, and just assigning `.value` in the
+ * page silently no-ops on a React-controlled input — the native value setter
+ * plus a dispatched `input`/`change` event is what actually reaches React's
+ * `onChange`.
+ */
+export async function setBucketColor(
+  window: Page,
+  bucketName: string,
+  hexColor: string
+): Promise<void> {
+  const result = await window.evaluate(
+    ({ bucketName, hexColor }) => {
+      const nameSpan = Array.from(document.querySelectorAll('[class*="_name_"]')).find(
+        (el) => el.textContent === bucketName
+      )
+      const li = nameSpan?.closest('li')
+      const input = li?.querySelector('input[type="color"]') as HTMLInputElement | null
+
+      if (!input) return { ok: false, reason: `no color input for "${bucketName}"` }
+
+      const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      nativeSetter?.call(input, hexColor)
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+      return { ok: true }
+    },
+    { bucketName, hexColor }
+  )
+
+  if (!result.ok) {
+    throw new Error(`setBucketColor(${bucketName}): ${result.reason}`)
+  }
+  await window.waitForTimeout(300)
+}
+
 export async function deleteBucket(window: Page, bucketName: string): Promise<void> {
   const openConfirm = await clickRowButton(window, bucketName, 'Delete')
   if (!openConfirm.ok) {
@@ -91,7 +168,9 @@ export async function clickRowButton(
       if (!nameSpan) return { ok: false, reason: `no row named "${bucketName}"` }
 
       const li = nameSpan.closest('li')
-      const actionsDiv = li ? Array.from(li.children).find((el) => el.className.includes('_actions_')) : null
+      const actionsDiv = li
+        ? Array.from(li.children).find((el) => el.className.includes('_actions_'))
+        : null
       if (!actionsDiv) return { ok: false, reason: `row for "${bucketName}" has no actions` }
 
       const button = Array.from(actionsDiv.querySelectorAll('button')).find(
@@ -118,7 +197,9 @@ export async function isRowButtonDisabled(
         (el) => el.textContent === bucketName
       )
       const li = nameSpan?.closest('li')
-      const actionsDiv = li ? Array.from(li.children).find((el) => el.className.includes('_actions_')) : null
+      const actionsDiv = li
+        ? Array.from(li.children).find((el) => el.className.includes('_actions_'))
+        : null
       const button = actionsDiv
         ? Array.from(actionsDiv.querySelectorAll('button')).find(
             (b) => b.textContent?.trim() === buttonText

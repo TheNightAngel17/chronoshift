@@ -7,7 +7,6 @@ import { defineConfig } from '@playwright/test'
 // workflow_dispatch GitHub Actions job (`.github/workflows/e2e.yml`) to run
 // them on demand until the pattern proves stable enough for the PR gate.
 export default defineConfig({
-  testDir: './tests/e2e',
   timeout: 30_000,
   // Each test launches its own Electron process against its own temp
   // userData dir, so tests are already isolated from each other — but
@@ -18,5 +17,15 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list'
+  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
+  // One project per renderer surface (not per tab — Tracker is the tray menu
+  // + the four prompt windows, §8.2/§9, not a tab at all) so `--project=X`
+  // scopes a run to what you're actually touching. `tracker`/`review` have
+  // no spec files yet — their UI doesn't exist — and stay empty until it
+  // does; Playwright is fine with a project matching zero tests.
+  projects: [
+    { name: 'configuration', testDir: './tests/e2e/configuration' },
+    { name: 'tracker', testDir: './tests/e2e/tracker' },
+    { name: 'review', testDir: './tests/e2e/review' }
+  ]
 })
