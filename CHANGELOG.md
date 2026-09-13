@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Contributor Notes
 
+#### Fixed
+
+- The preload script failed to load under `sandbox: true` (`Error: module not found: @electron-toolkit/preload`), silently leaving `window.api` undefined in every renderer window — invisible until this cycle's bucket tree editor became the first code to actually call it. electron-vite's default dependency-externalization treated `@electron-toolkit/preload` as an external `require()`, which a sandboxed preload script can't resolve; `electron.vite.config.ts` now excludes it so it gets bundled into the preload output instead.
+
 #### Added
 
 - Pure epoch-ms day/week boundary helpers (`app/src/shared/time.ts`), built on `date-fns` per BUILD_PLAN §5.5 — no hand-rolled DST arithmetic.
