@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Added
 
+- Playwright-based Electron integration test harness (`app/tests/e2e/`, `app/playwright.config.ts`): seeds an isolated SQLite database, launches the real built app against it, drives it through the UI, then reopens that database file after the app closes to assert the rows it actually wrote. Run locally via `npm run test:e2e`; a `workflow_dispatch`-only Actions workflow (`.github/workflows/e2e.yml`) runs the suite on demand. Not part of the PR gate yet. First coverage: the bucket tree editor's create/rename/archive/reparent round-trip, the depth-4 refusal, the system break bucket's guards, and the delete-with-children error message.
 - Pure epoch-ms day/week boundary helpers (`app/src/shared/time.ts`), built on `date-fns` per BUILD_PLAN §5.5 — no hand-rolled DST arithmetic.
 - Shared domain types and IPC contract (`app/src/shared/types.ts`, `app/src/shared/ipc-contract.ts`) per BUILD_PLAN §11, importable unchanged from both the main and renderer processes.
 - Main-process SQLite connection singleton (`app/src/main/db/connection.ts`) with the required WAL / foreign key / busy-timeout pragmas.

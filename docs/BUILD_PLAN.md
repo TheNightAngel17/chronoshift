@@ -722,6 +722,8 @@ Unit tests are worth writing for exactly three things, because they're where the
 
 Everything else is better verified by using the app. Use `vitest`; skip renderer component tests for v1.
 
+**Integration tests** (`app/tests/e2e/`, Playwright's Electron driver) are a separate layer from the above, not a substitute for it or an exception to "skip renderer component tests": they launch the real built app against a seeded database, drive it through the UI, and reopen the database afterward to assert what actually got written — automating the "use the app" manual check for flows worth re-running on every change (BUILD_PLAN §12's per-phase manual-acceptance criteria are natural candidates), rather than testing a component's rendering in isolation. Local-only via `npm run test:e2e` for now; not part of the CI gate.
+
 ## 16. Deferred, with hooks already in place
 
 - **Workday sync** — `buckets.source`, `external_id`, `external_type` exist and are unused. A sync would upsert Project → Phase → Task nodes with `source='workday'`, leaving local buckets untouched, and mark synced nodes read-only in the tree editor.
