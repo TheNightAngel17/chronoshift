@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Main-process bucket IPC handlers and registration for all `buckets:*` channels, including argument validation and `Result<T>` error mapping for depth/cycle/delete rejections.
 - Main-process segments repository (`app/src/main/db/repositories/segments.ts`) enforcing the BUILD_PLAN §5.1/§5.2 timeline invariants (single open segment, no overlaps, watermark ranges) with `create`/`open`/`switch`/`update`/`split`/`merge`/`range`/`needsReview` primitives.
 - Settings, check-ins, idle events, and app-state repositories (`app/src/main/db/repositories/{settings,checkins,idleEvents,appState}.ts`) providing typed CRUD and §7 settings validation over those tables.
+- The shared prompt window shell (`app/src/main/windows/promptWindow.ts`, `app/src/renderer/prompt.html` + `prompt-app/App.tsx`) and its arbitration queue (`app/src/main/services/promptQueue.ts`), implementing decision ticket #8's Recovery > Idle > Checkin strict-priority model: a higher-priority prompt forcibly closes and times out whatever's on screen, and a `checkins` row is only ever created at the moment a check-in is actually displayed. No producer wires into it yet (the check-in scheduler is issue #43), so nothing user-visible changes this cycle. Preload gained a `prompts.onShow` event subscription (and the `IpcEventSubscriber` type it's built on) as the first main → renderer event forwarding in the app.
 
 #### Removed
 

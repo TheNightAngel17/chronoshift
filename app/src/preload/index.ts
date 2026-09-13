@@ -1,8 +1,11 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import {
+  IpcEventChannel,
   IpcInvokeChannel,
   type ChronoShiftApi,
+  type IpcEventChannelName,
+  type IpcEventMap,
   type IpcInvokeChannelName,
   type IpcInvokeMap
 } from '../shared/ipc-contract'
@@ -17,6 +20,25 @@ function invoke<Channel extends IpcInvokeChannelName>(
   return ipcRenderer.invoke(channel, ...args) as Promise<IpcInvokeMap[Channel]['result']>
 }
 
+// Every main → renderer event goes through this wrapper for the same reason.
+// `ipcRenderer.removeListener` needs the exact function reference `.on` was
+// given, so this hands the caller an unsubscribe closure over that reference
+// rather than requiring them to track it themselves.
+function subscribe<Channel extends IpcEventChannelName>(
+  channel: Channel,
+  listener: (payload: IpcEventMap[Channel]) => void
+): () => void {
+  const handler = (_event: IpcRendererEvent, payload: IpcEventMap[Channel]): void => {
+    listener(payload)
+  }
+
+  ipcRenderer.on(channel, handler)
+
+  return () => {
+    ipcRenderer.removeListener(channel, handler)
+  }
+}
+
 // Custom APIs for renderer
 const api: ChronoShiftApi = {
   buckets: {
@@ -29,6 +51,9 @@ const api: ChronoShiftApi = {
     archive: (id, archived) => invoke(IpcInvokeChannel.bucketsArchive, id, archived),
     delete: (id) => invoke(IpcInvokeChannel.bucketsDelete, id),
     recents: (limit) => invoke(IpcInvokeChannel.bucketsRecents, limit)
+  },
+  prompts: {
+    onShow: (listener) => subscribe(IpcEventChannel.promptShow, listener)
   }
 }
 
