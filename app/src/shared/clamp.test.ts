@@ -23,16 +23,21 @@ describe('clampBackdate', () => {
   })
 
   it('floors a value before the previous segment’s endedAt (step 2, previous-segment side)', () => {
-    const beforePrevious = previousSegmentEndedAt - 60_000
+    // Make previousSegmentEndedAt the binding term in max(startedAt, previousEndedAt)
+    // by placing it after currentSegmentStartedAt, so this genuinely exercises the
+    // previous-segment side rather than coincidentally landing on the same floor
+    // the current-segment-side test below already covers.
+    const laterPreviousEndedAt = new Date('2024-06-15T09:15:00.000Z').getTime()
+    const beforePrevious = laterPreviousEndedAt - 60_000
 
     const result = clampBackdate(
       beforePrevious,
       now,
       currentSegmentStartedAt,
-      previousSegmentEndedAt
+      laterPreviousEndedAt
     )
 
-    expect(result).toEqual({ value: currentSegmentStartedAt, wasAdjusted: true })
+    expect(result).toEqual({ value: laterPreviousEndedAt, wasAdjusted: true })
   })
 
   it('floors a value before the current segment’s startedAt (step 2, current-segment side)', () => {
