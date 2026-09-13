@@ -224,12 +224,11 @@ Every prompt that changes state offers an optional backdate. The `SinceWhenInput
 - An absolute time entry field
 - Default: now
 
-**Clamping rules** — enforce in the main process, not just the UI:
+**Clamping rules** — enforce in the main process, not just the UI, applied as an **ordered pipeline** (not independent checks, since they can compound — e.g. flooring against a previous segment can itself land past `now`):
 
-- Cannot be in the future.
-- Cannot be earlier than the current open segment's `started_at`.
-- Cannot be earlier than the previous segment's `ended_at`.
-- If the value would produce a zero-length segment, snap to now and note it.
+1. Clamp to `now` if the value is in the future. Compare against live wall-clock `now`, not a cached value, so a backward clock change doesn't leave a stale future value unclamped.
+2. Floor to `max(current segment's started_at, previous segment's ended_at)`. If there is no previous segment (the very first segment ever), this floor is simply the current segment's `started_at`.
+3. If step 2's result is `>= now` or otherwise zero/negative length, snap to `now` and note it.
 
 ## 6. Database schema
 
@@ -718,7 +717,7 @@ Three tiers, in the sense CONTRIBUTING.md's Testing section spells out in full �
 
 **Unit** (`src/**/*.test.ts`, no DB, no Electron) is worth writing for exactly three things beyond ordinary function coverage, because they're where the bugs hide:
 
-1. **Segment invariants** — a property-style test that applies a long random sequence of start/switch/stop/split/merge/edit operations and asserts after each that there are no overlaps, at most one open segment, no zero-length segments, and every `confirmed_through` in range.
+1. **Segment invariants** — a property-style test, using [`fast-check`](https://github.com/dubzzz/fast-check) (a devDependency, test-only — never shipped) for generation and automatic shrinking of failing sequences. It applies a long random sequence of every non-retrospective transition from `services/tracking.ts`'s reducer (start, confirm, switch, break, stop, snooze, the four idle-resolution outcomes, and recovery's close/keep-running variants — see [issue #7](https://github.com/TheNightAngel17/chronoshift/issues/7)'s transition table) and asserts after each that there are no overlaps, at most one open segment, no zero-length segments, and every `confirmed_through` in range. Retrospective edit/split/merge are a separate stateless repository operation (per #7), not a reducer transition, and get their own test once that build issue exists — this property test does not exercise them.
 2. **Watermark arithmetic** — the section 5.2 worked example plus the split and merge rules, as explicit cases.
 3. **Clamping** — every "since when" rule from section 5.6, including the awkward ones.
 
