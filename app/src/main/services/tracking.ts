@@ -110,15 +110,21 @@ export type TrackingEvent = { now: number } &
     | { type: 'idleReassign'; gap: IdleGap; bucketId: number }
     /** 10. `IdlePrompt`: leave the gap untracked (§5.1.3 — no filler row). */
     | { type: 'idleUntracked'; gap: IdleGap }
-    /** 11. `RecoveryPrompt`: end at last confirmed / last seen / a custom time. */
+    /**
+     * 11. `RecoveryPrompt`: end at last confirmed / last seen / a custom time.
+     * `idleEventId` names the `app_gone` row §8.5 always creates before showing
+     * this prompt (see `RecoveryInfo.idleEventId`) — it gets resolved as
+     * `resolution='split'` per issue #7's table ("reuses idle-resolution shape").
+     */
     | {
         type: 'recoveryClose'
         /** Which of §9.4's options produced `at`; provenance for the caller, not used to branch. */
         choice: Exclude<RecoveryChoice, 'keep_running'>
         at: number
+        idleEventId: number
       }
-    /** 12. `RecoveryPrompt`: keep running. */
-    | { type: 'recoveryKeepRunning' }
+    /** 12. `RecoveryPrompt`: keep running — resolves the same `app_gone` row as `resolution='kept'`. */
+    | { type: 'recoveryKeepRunning'; idleEventId: number }
   )
 
 /**
@@ -475,22 +481,51 @@ export function reduce(state: TrackingMachineState, event: TrackingEvent): Track
       return resolveIdleGap(tracking, event, event.gap, event.bucketId, 'reassigned')
 
     case 'idleUntracked':
-      // TODO(spec): §9.3's `idle_events.resolution` vocabulary has no
-      // "left untracked" value; 'split' is the closest of the five, since the
-      // segment really is split around the gap. Confirm or add a value.
+      // Issue #7's table assigns this transition `resolution='split'` (the
+      // segment really is split around the gap, which is left with no row).
       return resolveIdleGap(tracking, event, event.gap, null, 'split')
 
-    case 'recoveryClose':
+    case 'recoveryClose': {
       // The recovered segment's provenance becomes 'recovery' per issue #7's
       // table. (`SegmentPatch` does not accept `origin` today — #40's mapping
-      // will need it to.)
-      return closeAndStop(tracking, event, event.at, 'recovery')
+      // will need it to.) The `app_gone` idle event that triggered this prompt
+      // (§8.5) is settled alongside it, as 'split' per issue #7's table.
+      const closed = closeAndStop(tracking, event, event.at, 'recovery')
+
+      return {
+        state: closed.state,
+        writes: [
+          ...closed.writes,
+          {
+            kind: 'resolveIdleEvent',
+            idleEventId: event.idleEventId,
+            resolution: 'split',
+            resolvedAt: event.now
+          }
+        ]
+      }
+    }
 
     case 'recoveryKeepRunning':
-      // The segment was genuinely still running; nothing to write.
-      return { state, writes: [] }
+      // The segment was genuinely still running — the timeline is untouched,
+      // but the `app_gone` idle event still needs settling, as 'kept'.
+      return {
+        state,
+        writes: [
+          {
+            kind: 'resolveIdleEvent',
+            idleEventId: event.idleEventId,
+            resolution: 'kept',
+            resolvedAt: event.now
+          }
+        ]
+      }
 
-    default:
-      return { state, writes: [] }
+    default: {
+      // Exhaustiveness guard: a new `TrackingEvent` variant added without a
+      // matching `case` above fails the build here instead of silently no-oping.
+      const unhandled: never = event
+      throw new Error(`Unhandled tracking event: ${JSON.stringify(unhandled)}`)
+    }
   }
 }

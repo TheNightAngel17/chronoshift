@@ -319,6 +319,36 @@ describe('reduce — issue #7 transition table', () => {
     ])
   })
 
+  it('floors a backdated switch to the current segment’s confirmation watermark', () => {
+    // Confirm the segment through 09:30, then try to switch "since 09:10" —
+    // earlier than what the user already affirmatively confirmed. §5.6 is
+    // silent on this case; backdateInto's extra floor keeps it from
+    // un-confirming (segments.switch rejects this outright in the real repo).
+    const confirmed = reduce(trackingSince(at('09:00')), {
+      type: 'confirmStillOnIt',
+      now: at('09:30')
+    }).state
+
+    const switched = reduce(confirmed, {
+      type: 'switchBucket',
+      now: at('09:45'),
+      bucketId: BETA_FIX,
+      sinceWhen: at('09:10')
+    })
+
+    expect(switched.writes).toEqual([
+      { kind: 'closeOpenSegment', endedAt: at('09:30'), confirmedThrough: at('09:30') },
+      {
+        kind: 'openSegment',
+        bucketId: BETA_FIX,
+        startedAt: at('09:30'),
+        confirmedThrough: at('09:45'),
+        origin: 'checkin',
+        note: null
+      }
+    ])
+  })
+
   it('takes a break as a plain switch to the break bucket (§5.3, ADR 0001)', () => {
     const reduced = reduce(trackingSince(at('09:00')), {
       type: 'takeBreak',
@@ -463,14 +493,15 @@ describe('reduce — issue #7 transition table', () => {
     expect(reduced.state.previousSegmentEndedAt).toBe(at('09:30'))
   })
 
-  it('closes with recovery provenance, or keeps running untouched', () => {
+  it('closes with recovery provenance and settles the app_gone idle event, or keeps running untouched', () => {
     const tracking = trackingSince(at('09:00'))
 
     const closed = reduce(tracking, {
       type: 'recoveryClose',
       now: at('13:00'),
       choice: 'end_at_last_seen',
-      at: at('11:20')
+      at: at('11:20'),
+      idleEventId: 42
     })
 
     expect(closed.state.status).toBe('not_tracking')
@@ -480,13 +511,20 @@ describe('reduce — issue #7 transition table', () => {
         endedAt: at('11:20'),
         confirmedThrough: at('11:20'),
         origin: 'recovery'
-      }
+      },
+      { kind: 'resolveIdleEvent', idleEventId: 42, resolution: 'split', resolvedAt: at('13:00') }
     ])
 
-    const kept = reduce(tracking, { type: 'recoveryKeepRunning', now: at('13:00') })
+    const kept = reduce(tracking, {
+      type: 'recoveryKeepRunning',
+      now: at('13:00'),
+      idleEventId: 42
+    })
 
     expect(kept.state).toBe(tracking)
-    expect(kept.writes).toEqual([])
+    expect(kept.writes).toEqual([
+      { kind: 'resolveIdleEvent', idleEventId: 42, resolution: 'kept', resolvedAt: at('13:00') }
+    ])
   })
 })
 
@@ -578,9 +616,15 @@ function buildEvent(
     case 'idleUntracked':
       return { type: 'idleUntracked', now, gap }
     case 'recoveryClose':
-      return { type: 'recoveryClose', now, choice: 'end_at_custom', at: now - step.sinceAgoMs }
+      return {
+        type: 'recoveryClose',
+        now,
+        choice: 'end_at_custom',
+        at: now - step.sinceAgoMs,
+        idleEventId
+      }
     case 'recoveryKeepRunning':
-      return { type: 'recoveryKeepRunning', now }
+      return { type: 'recoveryKeepRunning', now, idleEventId }
     case 'snooze':
       return { type: 'snooze', now }
     case 'confirmStillOnIt':
