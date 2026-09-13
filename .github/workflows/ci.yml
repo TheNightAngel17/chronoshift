@@ -44,7 +44,14 @@ jobs:
   windows-ci-build-test:
     needs: ci-build-test-check-dir
     if: needs.ci-build-test-check-dir.outputs.app_changed != 'false'
-    runs-on: windows-latest
+    # Self-hosted, on the maintainer's own machine (labels from the runner's
+    # own registration: self-hosted, Windows, X64).
+    # `actions/checkout`'s default `clean: true` still wipes `node_modules`
+    # before every run, but npm's own package cache lives outside the
+    # workspace and survives across runs on this machine, so `npm ci` mostly
+    # hits disk instead of the network — the actual reason this got faster,
+    # not anything configured here.
+    runs-on: [self-hosted, Windows, X64]
     defaults:
       run:
         working-directory: app
@@ -56,8 +63,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: app/package-lock.json
 
       - name: Install dependencies
         run: npm ci
