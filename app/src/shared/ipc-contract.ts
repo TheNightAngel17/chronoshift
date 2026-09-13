@@ -190,5 +190,29 @@ export type IpcEventMap = {
 /** Union of every renderer → main invoke channel name. */
 export type IpcInvokeChannelName = (typeof IpcInvokeChannel)[keyof typeof IpcInvokeChannel]
 
+/** The renderer-facing signature of a single invoke channel, as bridged by preload. */
+export type IpcInvoker<Channel extends IpcInvokeChannelName> = (
+  ...args: IpcInvokeMap[Channel]['params']
+) => Promise<IpcInvokeMap[Channel]['result']>
+
+/** The `buckets:*` slice of the preload bridge (§5.4, §11). */
+export interface BucketsApi {
+  tree: IpcInvoker<typeof IpcInvokeChannel.bucketsTree>
+  create: IpcInvoker<typeof IpcInvokeChannel.bucketsCreate>
+  update: IpcInvoker<typeof IpcInvokeChannel.bucketsUpdate>
+  move: IpcInvoker<typeof IpcInvokeChannel.bucketsMove>
+  archive: IpcInvoker<typeof IpcInvokeChannel.bucketsArchive>
+  delete: IpcInvoker<typeof IpcInvokeChannel.bucketsDelete>
+  recents: IpcInvoker<typeof IpcInvokeChannel.bucketsRecents>
+}
+
+/**
+ * The `window.api` surface exposed by preload via `contextBridge` (§11). The
+ * renderer never touches `ipcRenderer` directly; it goes through this.
+ */
+export interface ChronoShiftApi {
+  buckets: BucketsApi
+}
+
 /** Union of every main → renderer event channel name. */
 export type IpcEventChannelName = (typeof IpcEventChannel)[keyof typeof IpcEventChannel]

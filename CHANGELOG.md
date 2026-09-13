@@ -7,10 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Contributor Notes
+### Release Notes
 
 #### Added
 
+- The Configuration tab now has a bucket tree editor: create buckets, rename them, move them up and down, reparent them, pick their color, archive them, and delete the ones no time has been tracked against. Nesting stops at four levels, and the built-in "Break / Away" bucket only lets you change its color.
+
+### Contributor Notes
+
+#### Fixed
+
+- The preload script failed to load under `sandbox: true` (`Error: module not found: @electron-toolkit/preload`), silently leaving `window.api` undefined in every renderer window — invisible until this cycle's bucket tree editor became the first code to actually call it. electron-vite's default dependency-externalization treated `@electron-toolkit/preload` as an external `require()`, which a sandboxed preload script can't resolve; `electron.vite.config.ts` now excludes it so it gets bundled into the preload output instead.
+
+#### Added
+
+- Formalized the three-tier testing taxonomy (CONTRIBUTING.md, BUILD_PLAN §15) — unit (`src/**/*.test.ts`), integration (`src/**/*.integration.test.ts`, real sqlite, no Electron; the existing DB/IPC-handler tests are renamed onto this convention), and e2e — and added the e2e tier: a Playwright-based Electron test harness (`app/tests/e2e/`, `app/playwright.config.ts`) that seeds an isolated SQLite database, launches the real built app, drives it through the UI, then reopens that database file to assert the rows it actually wrote. One Playwright `project` per renderer surface (`configuration`, `tracker`, `review` — mapped to actual UI surfaces, not tabs) so `--project=<name>` scopes a run. Run locally via `npm run test:e2e`; a `workflow_dispatch`-only Actions workflow (`.github/workflows/e2e.yml`) runs the suite on demand. Not part of the PR gate yet. First coverage, as several realistic multi-step flows rather than one test per affordance: building simple and 4-level bucket trees (plus the depth-4 refusal), reparenting across branches and reordering, renaming/coloring (including the sibling-name-swap-on-conflict behavior), the system break bucket's guards, and deletion (including the delete-with-children error message).
 - Pure epoch-ms day/week boundary helpers (`app/src/shared/time.ts`), built on `date-fns` per BUILD_PLAN §5.5 — no hand-rolled DST arithmetic.
 - Shared domain types and IPC contract (`app/src/shared/types.ts`, `app/src/shared/ipc-contract.ts`) per BUILD_PLAN §11, importable unchanged from both the main and renderer processes.
 - Main-process SQLite connection singleton (`app/src/main/db/connection.ts`) with the required WAL / foreign key / busy-timeout pragmas.

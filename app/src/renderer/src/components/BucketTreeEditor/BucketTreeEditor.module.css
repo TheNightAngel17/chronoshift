@@ -1,0 +1,175 @@
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.hint {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.875rem;
+}
+
+.error {
+  margin: 0;
+  border: 1px solid #7f1d1d;
+  border-radius: 12px;
+  padding: 12px 16px;
+  background: rgba(127, 29, 29, 0.25);
+  color: #fecaca;
+  line-height: 1.5;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list .list {
+  margin-top: 8px;
+  padding-left: 24px;
+  border-left: 1px solid #1f2937;
+}
+
+.row,
+.archivedRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.archivedRow {
+  opacity: 0.55;
+}
+
+.rowMain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid rgba(226, 232, 240, 0.35);
+}
+
+.name {
+  font-weight: 600;
+}
+
+.badge {
+  border: 1px solid #334155;
+  border-radius: 999px;
+  padding: 2px 8px;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.actions,
+.inlineForm,
+.createForm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.createForm {
+  padding-top: 4px;
+}
+
+.button,
+.primaryButton,
+.dangerButton {
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.primaryButton {
+  border-color: #60a5fa;
+  background: #1d4ed8;
+  color: #eff6ff;
+}
+
+.dangerButton {
+  border-color: #ef4444;
+  background: #7f1d1d;
+  color: #fee2e2;
+}
+
+.button:disabled,
+.primaryButton:disabled,
+.dangerButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.input {
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: #0f172a;
+  color: #e5e7eb;
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.colorControl input,
+.parentControl select {
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #e5e7eb;
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.colorControl input {
+  width: 34px;
+  height: 30px;
+  padding: 2px;
+}
+
+.parentControl select {
+  padding: 6px 8px;
+  max-width: 220px;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

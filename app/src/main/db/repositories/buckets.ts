@@ -1,6 +1,9 @@
 import type Database from 'better-sqlite3'
+import { deriveDeterministicBucketColor } from '../../../shared/colors'
 import type { BucketPatch } from '../../../shared/ipc-contract'
 import type { Bucket, BucketNode } from '../../../shared/types'
+
+export { deriveDeterministicBucketColor }
 
 type BucketRow = {
   id: number
@@ -37,11 +40,6 @@ const SELECT_BUCKET_COLUMNS = `
     updated_at
   FROM buckets
 `
-
-export function deriveDeterministicBucketColor(id: number): string {
-  const hue = Math.abs(Math.imul(id, 137)) % 360
-  return `hsl(${hue} 60% 50%)`
-}
 
 function mapBucketRow(row: BucketRow): Bucket {
   return {

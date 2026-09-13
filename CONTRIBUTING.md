@@ -25,6 +25,16 @@ npm run dev
 - Use the vocabulary in `CONTEXT.md` in code, comments, commits, and PR descriptions. If you need a term that isn't there, either you're inventing language the project doesn't use (reconsider) or there's a real gap — flag it rather than picking your own word.
 - Write an ADR under `docs/adr/` only when a decision is hard to reverse, would be surprising without context, and involved a genuine trade-off. One paragraph is enough — the value is recording *that* the decision was made and *why*. Leave a one-line pointer from the `BUILD_PLAN.md` section it affects.
 
+## Testing
+
+Three tiers, broadest and cheapest first — put a new test in the lowest tier that can actually exercise it, since each tier up costs roughly an order of magnitude more to run:
+
+1. **Unit** — `src/**/*.test.ts`, colocated with the code it tests. One unit of code against itself: no database, no Electron, no filesystem. Runs under `vitest`.
+2. **Integration** — `src/**/*.integration.test.ts`, colocated the same way. One unit of code against a real local dependency — a real (in-memory or temp-file) sqlite database via `better-sqlite3`, no Electron. This is where repository and IPC-handler business rules belong (depth/cycle checks, delete-if-unused, color inheritance, and so on) — it's fast enough that "test everything a user can do" mostly belongs here, not at the e2e tier. Also runs under `vitest`; `npm run test:unit` / `npm run test:integration` scope to one tier, `npm run test:run` runs both.
+3. **E2e** — `app/tests/e2e/`, one Playwright `project` per renderer surface (see `playwright.config.ts`; currently `configuration`, `tracker`, `review` — mapped to what's actually a distinct UI surface, not 1:1 with main-window tabs). Launches the real built app against a seeded, isolated database, drives it through the UI, then reopens that database file to assert what actually got written. Deliberately the thin top of the pyramid: a handful of realistic multi-step flows per area (seed → launch → interact/assert × N → cleanup), each hitting every relevant affordance at least once in a plausible sequence — not a combinatorial sweep of every button at every tree depth, and not a re-test of business rules already covered at the integration tier. Run via `npm run test:e2e` (`--project=<name>` to scope one area) after `npm run build`; local-only for now (`.github/workflows/e2e.yml` is `workflow_dispatch`-only), not part of the CI gate.
+
+See [BUILD_PLAN §15](./docs/BUILD_PLAN.md#15-testing-notes) for what's specific to this app rather than the taxonomy itself (which unit tests are worth writing beyond ordinary coverage, what each e2e project actually spans).
+
 ## Before opening a pull request
 
 From `app/`:
