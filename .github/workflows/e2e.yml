@@ -8,7 +8,9 @@ permissions:
 
 jobs:
   windows-e2e:
-    runs-on: windows-latest
+    # Self-hosted, on the maintainer's own machine (same runner CI uses —
+    # see ci.yml for why deps install faster here than on windows-latest).
+    runs-on: [self-hosted, Windows, X64]
     defaults:
       run:
         working-directory: app
@@ -20,8 +22,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: app/package-lock.json
 
       - name: Install dependencies
         run: npm ci
