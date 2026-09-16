@@ -3,11 +3,31 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { hasHiddenLaunchFlag } from '../shared/startup'
+import * as settingsRepository from './db/repositories/settings'
 import { registerIpcHandlers } from './ipc'
+import { PromptQueue } from './services/promptQueue'
 import { createTray } from './tray'
+import { PromptWindow } from './windows/promptWindow'
 
 let mainWindow: BrowserWindow | null = null
 let isQuitting = false
+
+// Wired here (rather than exported) because nothing yet calls into it: the
+// scheduler/idle-monitor producers for the Recovery/Idle/Checkin slots land
+// in later issues. This just connects the shell's two halves so Escape
+// actually reaches `PromptQueue.dismissCurrent()` end-to-end (BUILD_PLAN §9).
+function createPromptSystem(): PromptQueue {
+  const promptWindow = new PromptWindow(() => settingsRepository.getAll().promptStealFocus)
+
+  const promptQueue = new PromptQueue({
+    callbacks: {
+      onDisplay: (payload) => promptWindow.show(payload, () => promptQueue.dismissCurrent()),
+      onHide: () => promptWindow.hide()
+    }
+  })
+
+  return promptQueue
+}
 
 const startHidden = hasHiddenLaunchFlag(process.argv)
 
@@ -83,6 +103,7 @@ app.whenReady().then(() => {
   })
 
   registerIpcHandlers()
+  createPromptSystem()
   mainWindow = createWindow()
   createTray({
     iconPath: icon,

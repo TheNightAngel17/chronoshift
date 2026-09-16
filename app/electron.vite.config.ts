@@ -22,6 +22,17 @@ export default defineConfig({
         '@renderer': resolve('src/renderer/src')
       }
     },
+    // electron-vite only auto-discovers a single `index.html` entry; a second
+    // page (prompt.html, §9) needs its rollup input listed explicitly or the
+    // packaged app has no `prompt.html` to load.
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve('src/renderer/index.html'),
+          prompt: resolve('src/renderer/prompt.html')
+        }
+      }
+    },
     plugins: [react()]
   }
 })

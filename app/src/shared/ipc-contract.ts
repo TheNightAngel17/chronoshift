@@ -207,11 +207,27 @@ export interface BucketsApi {
 }
 
 /**
+ * The renderer-facing signature of a single event subscription, as bridged by
+ * preload. Mirrors `IpcInvoker` for the main → renderer direction. Returns an
+ * unsubscribe function, since `ipcRenderer.removeListener` needs the same
+ * callback reference `ipcRenderer.on` was given.
+ */
+export type IpcEventSubscriber<Channel extends IpcEventChannelName> = (
+  listener: (payload: IpcEventMap[Channel]) => void
+) => () => void
+
+/** The `prompt:*` slice of the preload bridge (§9, §11). */
+export interface PromptsApi {
+  onShow: IpcEventSubscriber<typeof IpcEventChannel.promptShow>
+}
+
+/**
  * The `window.api` surface exposed by preload via `contextBridge` (§11). The
  * renderer never touches `ipcRenderer` directly; it goes through this.
  */
 export interface ChronoShiftApi {
   buckets: BucketsApi
+  prompts: PromptsApi
 }
 
 /** Union of every main → renderer event channel name. */
