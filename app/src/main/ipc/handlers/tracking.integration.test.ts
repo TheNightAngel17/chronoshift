@@ -235,6 +235,31 @@ describe('tracking IPC handlers', () => {
     })
   })
 
+  it('rolls back the whole switch when the second write fails mid-transaction', async () => {
+    await withHandlers(async ({ invoke, database, emitted, bucketId }) => {
+      const first = bucketId('First')
+      const nonexistentBucketId = first + 1_000
+
+      const started = unwrap(await invoke(IpcInvokeChannel.trackingStart, first))
+      const originalSegmentId = started.segment?.id
+      emitted.length = 0
+
+      // A switch's writes are [closeOpenSegment, openSegment]. Targeting a
+      // bucket that does not exist makes the second write fail its foreign-key
+      // check — proving the first write (closing "First") does not survive on
+      // its own if the whole transaction does not commit.
+      const failed = await invoke(IpcInvokeChannel.trackingSwitch, nonexistentBucketId)
+      expect(failed.ok).toBe(false)
+      expect(emitted).toEqual([])
+
+      const timeline = allSegments(database)
+      expect(timeline).toHaveLength(1)
+      expect(timeline[0].id).toBe(originalSegmentId)
+      expect(timeline[0].bucketId).toBe(first)
+      expect(timeline[0].endedAt).toBeNull()
+    })
+  })
+
   it('returns clear Result.error values for bad arguments', async () => {
     await withHandlers(async ({ invoke }) => {
       const badState = await (invoke as (...args: unknown[]) => Promise<unknown>)(

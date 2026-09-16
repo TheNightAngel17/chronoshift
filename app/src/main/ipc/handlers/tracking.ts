@@ -136,6 +136,14 @@ function readTrackingState(dependencies: TrackingDependencies, now: number): Tra
  * Applies the reducer's writes in one transaction. A switch's close-then-open
  * pair must not land half-applied (§14); the repository methods are each their
  * own transaction, which better-sqlite3 nests via savepoints.
+ *
+ * Deliberately does not call `SegmentsRepository.switch()` even though a
+ * `switchBucket`/`stopTracking` transition looks like exactly that method's
+ * job: the reducer's writes are more general than `switch()`'s fixed
+ * close-then-open shape (a zero-length close becomes `discardOpenSegment`, a
+ * delete, which `switch()` has no equivalent of), so every write kind is
+ * applied through the same one-write-at-a-time loop regardless of which
+ * transition produced it.
  */
 function applyWrites(
   dependencies: TrackingDependencies,
@@ -234,7 +242,10 @@ function applyTrackingEvent(
 
   applyWrites(dependencies, writes, loaded.openSegment?.id ?? null)
 
-  const state = readTrackingState(dependencies, Date.now())
+  // Reuse the event's own `now` rather than re-reading the clock: this module's
+  // whole point is that every instant it reasons about comes from the event
+  // (see the file header), not a fresh `Date.now()` call after the fact.
+  const state = readTrackingState(dependencies, event.now)
   dependencies.emit(IpcEventChannel.trackingChanged, state)
 
   return state
