@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Contributor Notes
 
+#### Added
+
+- Shared `BucketPicker` and `SinceWhenInput` components (`app/src/renderer/src/components/{BucketPicker,SinceWhenInput}/`) implementing BUILD_PLAN §10.3 and §5.6. `BucketPicker` opens on a static Recent/All chooser — Recent is a flat shortcut list from `buckets:recents`; All is the real tree via `buckets:tree`, drillable with a breadcrumb and back affordance — and typing at any point switches to a live substring search across full bucket paths (`Acme / Website / Build / Testing`); fully keyboard-operable (arrows, Enter, Backspace/ArrowLeft to go up, ArrowRight to drill in, Escape to close), archived buckets excluded throughout. `SinceWhenInput` provides the 5/10/15/30-minutes-ago quick buttons and an absolute entry field, defaulting to now, running every candidate through the already-merged `shared/clamp.ts` for live "adjusted to…" feedback (the main process still enforces the same rule authoritatively). Neither is wired into a prompt yet — that lands with `StartPrompt`/`CheckinPrompt` in their own tickets — so nothing user-visible changes this cycle.
+
 #### Fixed
 
 - The preload script failed to load under `sandbox: true` (`Error: module not found: @electron-toolkit/preload`), silently leaving `window.api` undefined in every renderer window — invisible until this cycle's bucket tree editor became the first code to actually call it. electron-vite's default dependency-externalization treated `@electron-toolkit/preload` as an external `require()`, which a sandboxed preload script can't resolve; `electron.vite.config.ts` now excludes it so it gets bundled into the preload output instead.
