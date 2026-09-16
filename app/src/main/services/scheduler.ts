@@ -208,7 +208,18 @@ export class CheckinScheduler {
     // Ignoring this prompt must not reschedule aggressively (§8.3): the next
     // one fires one interval after the target that *just* fired, not one
     // interval from now, so a chain of ignored prompts never drifts later
-    // and later relative to the original schedule.
-    this.scheduleAt(firedTarget + this.intervalMs())
+    // and later relative to the original schedule. But if wall-clock time
+    // has already jumped past that (e.g. the process was suspended for
+    // several intervals), armTimer() would fire again immediately — and
+    // again, and again, machine-gunning `requestCheckin` once per missed
+    // interval until the target finally lands in the future. Skip straight
+    // to the next interval boundary that's actually ahead of now() instead:
+    // one real fire now, one real schedule for later, no burst.
+    const interval = this.intervalMs()
+    let nextTarget = firedTarget + interval
+    while (nextTarget <= this.now()) {
+      nextTarget += interval
+    }
+    this.scheduleAt(nextTarget)
   }
 }

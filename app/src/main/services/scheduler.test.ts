@@ -195,6 +195,29 @@ describe('CheckinScheduler', () => {
     expect(requestCheckin).toHaveBeenCalledTimes(2)
   })
 
+  it('does not burst-fire a chain of immediate re-requests after waking up multiple intervals behind', () => {
+    const { scheduler, requestCheckin, clock } = setup(0)
+
+    scheduler.segmentOpened()
+    expect(scheduler.nextCheckinAt).toBe(INTERVAL_MS)
+
+    // Simulate a long suspend: wall-clock time jumps 2.5 intervals past the
+    // original target with no timers having fired at all, then the process
+    // wakes and reevaluate() is called once (as `powerMonitor`'s `resume`
+    // would trigger). A naive "reschedule one interval past the stale
+    // target" would still land in the past here, and the rearmed
+    // zero-delay timer would fire again immediately — repeatedly — until it
+    // finally caught up, machine-gunning `requestCheckin` in the process.
+    clock.value = Math.floor(INTERVAL_MS * 2.5)
+    scheduler.reevaluate()
+    vi.advanceTimersByTime(0)
+    vi.advanceTimersByTime(0)
+    vi.advanceTimersByTime(0)
+
+    expect(requestCheckin).toHaveBeenCalledTimes(1)
+    expect(scheduler.nextCheckinAt).toBeGreaterThan(clock.value)
+  })
+
   it('never requests the Checkin slot while no segment is open', () => {
     const { scheduler, requestCheckin, getTrackingState, clock } = setup(0)
 
