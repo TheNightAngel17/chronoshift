@@ -52,6 +52,26 @@ const api: ChronoShiftApi = {
     delete: (id) => invoke(IpcInvokeChannel.bucketsDelete, id),
     recents: (limit) => invoke(IpcInvokeChannel.bucketsRecents, limit)
   },
+  tracking: {
+    state: () => invoke(IpcInvokeChannel.trackingState),
+    start: (bucketId, since) => invoke(IpcInvokeChannel.trackingStart, bucketId, since),
+    switch: (bucketId, since) => invoke(IpcInvokeChannel.trackingSwitch, bucketId, since),
+    stop: (since) => invoke(IpcInvokeChannel.trackingStop, since),
+    confirm: (at) => invoke(IpcInvokeChannel.trackingConfirm, at),
+    snooze: (minutes) => invoke(IpcInvokeChannel.trackingSnooze, minutes),
+    onChanged: (listener) => subscribe(IpcEventChannel.trackingChanged, listener)
+  },
+  segments: {
+    range: (fromMs, toMs) => invoke(IpcInvokeChannel.segmentsRange, fromMs, toMs),
+    create: (bucketId, start, end, note) =>
+      invoke(IpcInvokeChannel.segmentsCreate, bucketId, start, end, note),
+    update: (id, patch) => invoke(IpcInvokeChannel.segmentsUpdate, id, patch),
+    split: (id, atMs) => invoke(IpcInvokeChannel.segmentsSplit, id, atMs),
+    merge: (idA, idB) => invoke(IpcInvokeChannel.segmentsMerge, idA, idB),
+    delete: (id) => invoke(IpcInvokeChannel.segmentsDelete, id),
+    needsReview: (fromMs, toMs) => invoke(IpcInvokeChannel.segmentsNeedsReview, fromMs, toMs),
+    onChanged: (listener) => subscribe(IpcEventChannel.segmentsChanged, listener)
+  },
   prompts: {
     onShow: (listener) => subscribe(IpcEventChannel.promptShow, listener)
   }

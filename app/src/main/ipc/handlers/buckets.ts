@@ -1,54 +1,18 @@
-import { ipcMain, type IpcMain, type IpcMainInvokeEvent } from 'electron'
-import { IpcInvokeChannel, type BucketPatch, type IpcInvokeMap } from '../../../shared/ipc-contract'
-import type { Result } from '../../../shared/types'
+import { ipcMain } from 'electron'
+import { IpcInvokeChannel, type BucketPatch } from '../../../shared/ipc-contract'
 import { getDatabase } from '../../db/connection'
 import { BucketsRepository } from '../../db/repositories/buckets'
-
-type IpcRegistrar = Pick<IpcMain, 'handle'>
-type InvokeHandler<Channel extends keyof IpcInvokeMap> = (
-  event: IpcMainInvokeEvent,
-  ...args: IpcInvokeMap[Channel]['params']
-) => IpcInvokeMap[Channel]['result']
-
-function ok<T>(data: T): Result<T> {
-  return { ok: true, data }
-}
-
-function err<T>(error: string): Result<T> {
-  return { ok: false, error }
-}
-
-function toErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message
-  }
-
-  return 'Unexpected IPC handler failure.'
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function isInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value)
-}
-
-function validateIntegerArgument(value: unknown, name: string): string | null {
-  if (!isInteger(value)) {
-    return `${name} must be an integer.`
-  }
-
-  return null
-}
-
-function validateNullableIntegerArgument(value: unknown, name: string): string | null {
-  if (value === null) {
-    return null
-  }
-
-  return validateIntegerArgument(value, name)
-}
+import {
+  err,
+  isInteger,
+  isRecord,
+  validateIntegerArgument,
+  validateNoArguments,
+  validateNullableIntegerArgument,
+  withResult,
+  type InvokeHandler,
+  type IpcRegistrar
+} from './common'
 
 function validateName(name: unknown): string | null {
   if (typeof name !== 'string' || name.trim().length === 0) {
@@ -103,14 +67,6 @@ function validatePatch(patch: unknown): string | null {
   return null
 }
 
-function validateNoArguments(args: unknown[]): string | null {
-  if (args.length > 0) {
-    return 'This channel does not accept arguments.'
-  }
-
-  return null
-}
-
 function validateBooleanArgument(value: unknown, name: string): string | null {
   if (typeof value !== 'boolean') {
     return `${name} must be a boolean.`
@@ -133,14 +89,6 @@ function validateSortOrder(sortOrder: unknown): string | null {
   }
 
   return null
-}
-
-function withResult<T>(run: () => T): Result<T> {
-  try {
-    return ok(run())
-  } catch (error) {
-    return err(toErrorMessage(error))
-  }
 }
 
 export function registerBucketIpcHandlers(

@@ -222,11 +222,42 @@ export interface PromptsApi {
 }
 
 /**
+ * The `tracking:*` slice of the preload bridge (§5, §11). There is no separate
+ * "take a break" call: a break is an ordinary `switch` to the reserved
+ * `kind='break'` bucket (§5.3, ADR 0001).
+ */
+export interface TrackingApi {
+  state: IpcInvoker<typeof IpcInvokeChannel.trackingState>
+  start: IpcInvoker<typeof IpcInvokeChannel.trackingStart>
+  switch: IpcInvoker<typeof IpcInvokeChannel.trackingSwitch>
+  stop: IpcInvoker<typeof IpcInvokeChannel.trackingStop>
+  confirm: IpcInvoker<typeof IpcInvokeChannel.trackingConfirm>
+  snooze: IpcInvoker<typeof IpcInvokeChannel.trackingSnooze>
+  /** Fires whenever a mutating `tracking:*` call changes what is being tracked. */
+  onChanged: IpcEventSubscriber<typeof IpcEventChannel.trackingChanged>
+}
+
+/** The `segments:*` slice of the preload bridge (§5.1, §10, §11). */
+export interface SegmentsApi {
+  range: IpcInvoker<typeof IpcInvokeChannel.segmentsRange>
+  create: IpcInvoker<typeof IpcInvokeChannel.segmentsCreate>
+  update: IpcInvoker<typeof IpcInvokeChannel.segmentsUpdate>
+  split: IpcInvoker<typeof IpcInvokeChannel.segmentsSplit>
+  merge: IpcInvoker<typeof IpcInvokeChannel.segmentsMerge>
+  delete: IpcInvoker<typeof IpcInvokeChannel.segmentsDelete>
+  needsReview: IpcInvoker<typeof IpcInvokeChannel.segmentsNeedsReview>
+  /** Fires with the time range a mutating `segments:*` call affected. */
+  onChanged: IpcEventSubscriber<typeof IpcEventChannel.segmentsChanged>
+}
+
+/**
  * The `window.api` surface exposed by preload via `contextBridge` (§11). The
  * renderer never touches `ipcRenderer` directly; it goes through this.
  */
 export interface ChronoShiftApi {
   buckets: BucketsApi
+  tracking: TrackingApi
+  segments: SegmentsApi
   prompts: PromptsApi
 }
 
