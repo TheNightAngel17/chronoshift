@@ -1,29 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { clampBackdate } from '../../../../shared/clamp'
+import { formatClockTime, fromDatetimeLocalValue, toDatetimeLocalValue } from './sinceWhenLogic'
 import styles from './SinceWhenInput.module.css'
 
 const QUICK_MINUTES = [5, 10, 15, 30]
-
-/** `datetime-local` inputs take/emit `YYYY-MM-DDTHH:mm` in the browser's local time. */
-function toDatetimeLocalValue(ms: number): string {
-  const date = new Date(ms)
-  const pad = (value: number): string => value.toString().padStart(2, '0')
-
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
-    date.getHours()
-  )}:${pad(date.getMinutes())}`
-}
-
-/** `null` for a value the browser hasn't finished parsing yet (e.g. mid-edit). */
-function fromDatetimeLocalValue(value: string): number | null {
-  const parsed = new Date(value)
-
-  return Number.isNaN(parsed.getTime()) ? null : parsed.getTime()
-}
-
-function formatClockTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-}
 
 export interface SinceWhenInputProps {
   /** The segment being backdated into's `startedAt`, epoch ms — the §5.6 floor. */
